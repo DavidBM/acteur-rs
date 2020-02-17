@@ -3,6 +3,8 @@ name = "acteur"
 version = "0.1.0"
 authors = ["David Bonet <webbonet@gmail.com>"]
 edition = "2018"
+description = "An actor system that just works. Simple, robust, fast, documented."
+license = "Apache-2.0/MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
