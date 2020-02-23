@@ -24,7 +24,7 @@ trait Handle<T>: Actor {
 
 #[derive(Debug)]
 struct TestMessage {
-    field: String
+    pub field: String
 }
 
 
@@ -38,7 +38,6 @@ impl Actor for TestActor {
     type Id = u64;
 
     async fn activate(id: Self::Id) -> Self {
-        println!("Starting TestActor with id {}", id);
         TestActor {
             id: id.to_string()
         }
@@ -48,8 +47,7 @@ impl Actor for TestActor {
 #[async_trait]
 impl Handle<TestMessage> for TestActor {
     async fn handle(&mut self, message: TestMessage) {
-        println!("Handling TestMessage in TestActor with id {:?}", message);
-        println!("{:?}", message);
+        self.id = message.field;
     }
 }
 
@@ -57,7 +55,7 @@ impl Handle<TestMessage> for TestActor {
 
 #[derive(Debug)]
 struct TestMessage2 {
-    field: String
+    pub field: String
 }
 
 
@@ -80,7 +78,7 @@ impl Actor for TestActor2 {
 #[async_trait]
 impl Handle<TestMessage2> for TestActor2 {
     async fn handle(&mut self, message: TestMessage2) {
-        println!("Handling TestMessage2 in TestActor2 with id {:?}", message);
+        self.id = message.field;
     }
 }
 
@@ -124,10 +122,14 @@ pub fn start() {
             actor_managers: HashMap::new(),
         };
 
-        let message = TestMessage {field: "hola".to_string()};
-        sys.send::<TestActor, TestMessage>(43, message).await;
+        for _ in 0..10000000 {
+            let message = TestMessage {field: "hola".to_string()};
+            sys.send::<TestActor, TestMessage>(43, message).await;
 
-        let message = TestMessage {field: "adios".to_string()};
-        sys.send::<TestActor, TestMessage>(43, message).await;
+            let message = TestMessage2 {field: "hola".to_string()};
+            sys.send::<TestActor2, TestMessage2>(43, message).await;
+        }
+
+
     });
 }
