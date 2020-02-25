@@ -10,5 +10,6 @@ license = "Apache-2.0/MIT"
 
 [dependencies]
 async-trait = "0.1.24"
-async-std = "1.5.0"
+async-std = { version = "1.5.0", features = ["unstable"]}
 rand = "0.7.3"
+dashmap = "3.5.0"

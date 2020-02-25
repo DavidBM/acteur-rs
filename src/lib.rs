@@ -1,17 +1,21 @@
-use std::any::Any;
-use async_trait::{async_trait};
 use async_std::task::block_on;
-use std::collections::HashMap;
+use async_std::task::spawn;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use std::any::Any;
 use std::any::TypeId;
-
+use std::cmp::Eq;
+use std::hash::Hash;
+use std::sync::Arc;
+use async_std::sync::{channel, Receiver, Sender};
 
 #[async_trait]
-trait Actor: Sized {
-    type Id;
+pub trait Actor: Sized {
+    type Id: Default + Eq + Hash + Send + Sync + Clone;
 
-    pub async fn activate(id: Self::Id) -> Self;
+    async fn activate(id: Self::Id) -> Self;
 
-    async fn deactivate(&mut self)  -> Result<(), ()>{
+    async fn deactivate(&mut self) -> Result<(), ()> {
         Ok(())
     }
 }
@@ -21,26 +25,23 @@ trait Handle<T>: Actor {
     async fn handle(&mut self, message: T);
 }
 
-
 #[derive(Debug)]
 struct TestMessage {
-    pub field: String
+    pub field: String,
 }
-
 
 #[derive(Debug)]
 struct TestActor {
-    id: String
+    id: String,
+    values: std::collections::HashMap<u32, u32>,
 }
 
 #[async_trait]
 impl Actor for TestActor {
-    type Id = u64;
+    type Id = String;
 
     async fn activate(id: Self::Id) -> Self {
-        TestActor {
-            id: id.to_string()
-        }
+        TestActor { id: id.to_string(), values: std::collections::HashMap::new() }
     }
 }
 
@@ -51,46 +52,15 @@ impl Handle<TestMessage> for TestActor {
     }
 }
 
-
-
-#[derive(Debug)]
-struct TestMessage2 {
-    pub field: String
-}
-
-
-#[derive(Debug)]
-struct TestActor2 {
-    id: String
-}
-
-#[async_trait]
-impl Actor for TestActor2 {
-    type Id = u64;
-
-    async fn activate(id: Self::Id) -> Self {
-        TestActor2 {
-            id: id.to_string()
-        }
-    }
-}
-
-#[async_trait]
-impl Handle<TestMessage2> for TestActor2 {
-    async fn handle(&mut self, message: TestMessage2) {
-        self.id = message.field;
-    }
-}
-
 struct System {
-    actor_managers: HashMap<TypeId, Box<dyn Any>>,
+    actor_managers: DashMap<TypeId, Box<dyn Any>>,
 }
 
 impl System {
-    async fn send<A: 'static + Actor + Handle<M>, M>(&mut self, id: A::Id, message: M) {
+    pub async fn send<A: 'static + Actor + Handle<M>, M>(&self, id: A::Id, message: M) {
         let type_id = TypeId::of::<A>();
 
-        let actor = match self.actor_managers.get_mut(&type_id) {
+        let mut actor = match self.actor_managers.get_mut(&type_id) {
             Some(actor) => actor,
             None => {
                 self.add::<A>(id).await;
@@ -98,16 +68,16 @@ impl System {
                     Some(actor) => actor,
                     None => unreachable!(),
                 }
-            },
+            }
         };
 
-        match  actor.downcast_mut::<A>() {
+        match actor.downcast_mut::<A>() {
             Some(actor) => actor.handle(message).await,
             None => unreachable!(),
         };
     }
 
-    async fn add<A: 'static +  Actor>(&mut self, id: A::Id) {
+    async fn add<A: 'static + Actor>(&self, id: A::Id) {
         let type_id = TypeId::of::<A>();
 
         let actor = A::activate(id).await;
@@ -118,18 +88,120 @@ impl System {
 
 pub fn start() {
     block_on(async {
-        let mut sys = System {
-            actor_managers: HashMap::new(),
+        let manager = ActorManager::<TestActor>::new(42.to_string()).await;
+
+        let message = TestMessage {
+            field: "adios".to_string(),
         };
 
-        for _ in 0..10000000 {
-            let message = TestMessage {field: "hola".to_string()};
-            sys.send::<TestActor, TestMessage>(43, message).await;
+        manager.send(message).await;
 
-            let message = TestMessage2 {field: "hola".to_string()};
-            sys.send::<TestActor2, TestMessage2>(43, message).await;
+        let sys = System {
+            actor_managers: DashMap::new(),
+        };
+
+        for _ in 0..10_000_000 {
+            let message = TestMessage {
+                field: "hola".to_string(),
+            };
+
+            sys.send::<TestActor, TestMessage>(43.to_string(), message)
+                .await;
         }
-
-
     });
 }
+
+#[derive(Debug)]
+struct ActorManager<A: Actor> {
+    actors: Arc<DashMap<A::Id, A>>,
+    sender: Sender<Box<dyn Envelope<Actor = A>>>,
+}
+
+impl<A: std::marker::Sync + 'static + std::marker::Send + Actor> ActorManager<A> {
+    pub async fn new(id: <A as Actor>::Id) -> ActorManager<A> {
+        let (sender, receiver): (Sender<Box<dyn Envelope<Actor = A>>>, Receiver<Box<dyn Envelope<Actor = A>>>) = channel(5);
+
+        let actor = A::activate(Default::default()).await;
+
+        let actors_original = Arc::new(DashMap::new());
+
+        let id2 = id.clone();
+
+        actors_original.insert(id2, actor);
+
+        let actors = actors_original.clone();
+        spawn(async move {
+            while let Some(mut envelope) = receiver.recv().await {
+                match actors.get_mut(&id) {
+                    Some(mut actor) => envelope.handle(&mut actor).await,
+                    None => (),
+                }
+                
+            }
+        });
+
+        ActorManager {
+            actors: actors_original,
+            sender,
+        }
+    }
+
+    async fn send<M: 'static>(&self, message: M)
+    where
+        A: Handle<M>,
+        M: std::marker::Send,
+    {
+        let message = Message::<A, M>::new(Default::default(), message);
+
+        self.sender.send(Box::new(message)).await;
+    }
+}
+
+#[async_trait]
+pub trait Envelope: Send {
+    type Actor: Actor;
+
+    async fn handle(
+        &mut self,
+        actor: &mut Self::Actor,
+    );
+}
+
+#[derive(Debug)]
+struct Message<A: Actor, M> {
+    pub actor_id: A::Id,
+    message: Option<M>,
+}
+
+impl <A: 'static +  Handle<M> + Actor, M> Message<A, M> {
+    pub fn new(actor_id: A::Id, message: M) -> Self 
+    where A: Handle<M> {
+        Message {
+            actor_id,
+            message: Some(message),
+        }
+    }
+
+    pub async fn dispatch(&mut self, actor: &mut A) {
+        match self.message.take() {
+            Some(message) => {
+                <A as Handle<M>>::handle(actor, message).await;
+            }
+            None => ()
+        };
+    }
+}
+
+#[async_trait]
+impl <A: std::marker::Send + 'static + Actor + Handle<M>, M: std::marker::Send>Envelope for Message<A, M> {
+    type Actor = A;
+
+    async fn handle(
+        &mut self,
+        actor: &mut A
+    ) {
+        self.dispatch(actor).await
+    }
+}
+
+// We may need to create a queue by actor as if not there is no way to guarantee that they actor is executed only one time at once. And even if it can be guarantee, it may not be representable.
