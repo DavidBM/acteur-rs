@@ -8,7 +8,6 @@ use std::any::TypeId;
 use std::cmp::Eq;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::Arc;
 
 #[async_trait]
 pub trait Actor: Sized + Debug {
@@ -93,13 +92,13 @@ impl System {
 
 pub fn start() {
     block_on(async {
-        let manager = ActorsManager::<TestActor>::new(42.to_string()).await;
+        let manager = ActorsManager::<TestActor>::new().await;
 
         let message = TestMessage {
             field: "adios".to_string(),
         };
 
-        manager.send(message).await;
+        manager.send(42.to_string(), message).await;
 
         let sys = System {
             actor_managers: DashMap::new(),
@@ -118,49 +117,30 @@ pub fn start() {
 
 #[derive(Debug)]
 struct ActorsManager<A: Actor> {
-    actors: Arc<DashMap<A::Id, A>>,
-    sender: Sender<Box<dyn Envelope<Actor = A>>>,
+    actors: DashMap<A::Id, ActorProxy<A>>,
 }
 
 impl<A: Sync + 'static + Send + Actor> ActorsManager<A> {
-    pub async fn new(id: <A as Actor>::Id) -> ActorsManager<A> {
-        let (sender, receiver): (
-            Sender<Box<dyn Envelope<Actor = A>>>,
-            Receiver<Box<dyn Envelope<Actor = A>>>,
-        ) = channel(5);
-
-        let actor = A::activate(Default::default()).await;
-
-        let actors_original = Arc::new(DashMap::new());
-
-        let id2 = id.clone();
-
-        actors_original.insert(id2, actor);
-
-        let actors = actors_original.clone();
-        spawn(async move {
-            while let Some(mut envelope) = receiver.recv().await {
-                match actors.get_mut(&id) {
-                    Some(mut actor) => envelope.dispatch(&mut actor).await,
-                    None => (),
-                }
-            }
-        });
-
+    pub async fn new() -> ActorsManager<A> {
         ActorsManager {
-            actors: actors_original,
-            sender,
+            actors: DashMap::new(),
         }
     }
 
-    async fn send<M: 'static>(&self, message: M)
+    async fn send<M: 'static>(&self, id: A::Id, message: M)
     where
         A: Handle<M>,
         M: Send + Debug,
     {
-        let message = Letter::<A, M>::new(Default::default(), message);
-
-        self.sender.send(Box::new(message)).await;
+        match self.actors.get_mut(&id) {
+            Some(actor) => {
+                actor.send(message).await;
+            }
+            None => {
+                let actor = ActorProxy::<A>::new(id.clone()).await;
+                self.actors.insert(id, actor);
+            },
+        }
     }
 }
 
