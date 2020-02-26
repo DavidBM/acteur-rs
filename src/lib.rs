@@ -8,10 +8,11 @@ use std::any::TypeId;
 use std::cmp::Eq;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::marker::PhantomData;
 
 #[async_trait]
-pub trait Actor: Sized + Debug {
-    type Id: Default + Eq + Hash + Send + Clone + Debug;
+pub trait Actor: Debug {
+    type Id: Eq + Hash + Send + Clone + Debug;
 
     async fn activate(id: Self::Id) -> Self;
 
@@ -101,7 +102,7 @@ pub fn start() {
         let mut manager = ActorsManager::<TestActor>::new().await;
 
         let message = TestMessage {
-            field: "adios".to_string(),
+            field: "hola".to_string(),
         };
 
         manager.send(42.to_string(), message).await;
@@ -110,14 +111,16 @@ pub fn start() {
             actor_managers: DashMap::new(),
         };
 
-        for _ in 0..10_000_000 {
+        for i in 0..10_000_000 {
             let message = TestMessage {
-                field: "hola".to_string(),
+                field: i.to_string(),
             };
 
             sys.send::<TestActor, TestMessage>(43.to_string(), message)
                 .await;
         }
+
+        println!("All messages sent!");
     });
 }
 
@@ -172,18 +175,18 @@ pub trait Envelope: Send + Debug {
 
 #[derive(Debug)]
 struct Letter<A: Actor, M: Debug> {
-    pub actor_id: A::Id,
     message: Option<M>,
+    phantom: PhantomData<A>
 }
 
 impl<A: 'static + Handle<M> + Actor, M: Debug> Letter<A, M> {
-    pub fn new(actor_id: A::Id, message: M) -> Self
+    pub fn new(message: M) -> Self
     where
         A: Handle<M>,
     {
         Letter {
-            actor_id,
             message: Some(message),
+            phantom: PhantomData,
         }
     }
 
@@ -245,7 +248,7 @@ impl<A: 'static + Send + Actor> ActorProxy<A> {
         A: Handle<M>,
         M: Send + Debug,
     {
-        let message = Letter::<A, M>::new(Default::default(), message);
+        let message = Letter::<A, M>::new(message);
 
         self.sender
             .send(ActorProxyCommand::Dispatch(Box::new(message)))
