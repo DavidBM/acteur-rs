@@ -199,21 +199,24 @@ enum ActorProxyCommand<A: Actor> {
 
 #[derive(Debug)]
 struct ActorProxy<A: Actor> {
-    sender: Sender<Box<dyn Envelope<Actor = A>>>,
+    sender: Sender<ActorProxyCommand<A>>,
 }
 
 impl<A: Sync + 'static + Send + Actor> ActorProxy<A> {
     pub async fn new(id: <A as Actor>::Id) -> ActorProxy<A> {
         let (sender, receiver): (
-            Sender<Box<dyn Envelope<Actor = A>>>,
-            Receiver<Box<dyn Envelope<Actor = A>>>,
+            Sender<ActorProxyCommand<A>>,
+            Receiver<ActorProxyCommand<A>>,
         ) = channel(5);
 
         let mut actor = A::activate(id).await;
 
         spawn(async move {
-            while let Some(mut envelope) = receiver.recv().await {
-                envelope.dispatch(&mut actor).await
+            while let Some(command) = receiver.recv().await {
+                match command {
+                   ActorProxyCommand::End => break,
+                   ActorProxyCommand::Dispatch(mut envelope) => envelope.dispatch(&mut actor).await,
+                }
             }
         });
 
@@ -227,6 +230,6 @@ impl<A: Sync + 'static + Send + Actor> ActorProxy<A> {
     {
         let message = Letter::<A, M>::new(Default::default(), message);
 
-        self.sender.send(Box::new(message)).await;
+        self.sender.send(ActorProxyCommand::Dispatch(Box::new(message))).await;
     }
 }
