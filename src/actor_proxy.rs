@@ -21,7 +21,7 @@ pub(crate) struct ActorProxy<A: Actor> {
 }
 
 impl<A: Actor> ActorProxy<A> {
-    pub async fn new(id: <A as Actor>::Id) -> ActorProxy<A> {
+    pub async fn new(id: A::Id) -> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
             channel(5);
 
@@ -52,5 +52,9 @@ impl<A: Actor> ActorProxy<A> {
         self.sender
             .send(ActorProxyCommand::Dispatch(Box::new(message)))
             .await;
+    }
+
+    pub async fn end(&self) {
+        self.sender.send(ActorProxyCommand::End).await;
     }
 }

@@ -51,3 +51,10 @@ impl System {
         self.actor_managers.insert(type_id, Box::new(manager));
     }
 }
+
+impl Debug for System {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ActeurSystem ()")
+    }
+}
+

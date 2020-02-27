@@ -10,7 +10,7 @@ pub fn start() {
     block_on(async {
         let sys = System::new();
 
-        for i in 0..10_000_000 {
+        for i in 0..1 {
             let message = TestMessage {
                 field: i.to_string(),
             };
@@ -18,6 +18,10 @@ pub fn start() {
             sys.send::<TestActor, TestMessage>(43.to_string(), message)
                 .await;
         }
+
+        println!("Waiting...");
+
+        //async_std::task::sleep(std::time::Duration::from_secs(1)).await;
 
         println!("All messages sent!");
     });
@@ -49,7 +53,7 @@ impl Actor for TestActor {
 #[async_trait]
 impl Handle<TestMessage> for TestActor {
     async fn handle(&mut self, message: TestMessage) {
-        //println!("{:?}", message.field);
+        println!("{:?}", message.field);
         self.id = message.field;
     }
 }

@@ -43,4 +43,10 @@ impl<A: Actor> ActorsManager<A> {
             None => unreachable!(),
         }
     }
+
+    pub async fn end(&self) {
+        for actor in &self.actors {
+            actor.end().await;
+        }
+    }
 }
