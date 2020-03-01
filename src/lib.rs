@@ -8,3 +8,4 @@ mod system;
 pub use actor::Actor;
 pub use handle::Handle;
 pub use system::System;
+pub use actor_proxy::Secretary;

@@ -1,3 +1,4 @@
+use crate::system::AddressBook;
 use crate::actor::Actor;
 use crate::actor_proxy::ActorProxy;
 use crate::handle::Handle;
@@ -7,12 +8,14 @@ use std::fmt::Debug;
 #[derive(Debug)]
 pub(crate) struct ActorsManager<A: Actor> {
     actors: DashMap<A::Id, ActorProxy<A>>,
+    address_book: AddressBook,
 }
 
 impl<A: Actor> ActorsManager<A> {
-    pub async fn new() -> ActorsManager<A> {
+    pub async fn new(directory: AddressBook) -> ActorsManager<A> {
         ActorsManager {
             actors: DashMap::new(),
+            address_book: directory,
         }
     }
 
@@ -20,7 +23,7 @@ impl<A: Actor> ActorsManager<A> {
         match self.actors.get_mut(&id) {
             Some(_) => (),
             None => {
-                let actor = ActorProxy::<A>::new(id.clone()).await;
+                let actor = ActorProxy::<A>::new(self.address_book.clone(), id.clone()).await;
                 self.actors.insert(id, actor);
             }
         }
@@ -44,9 +47,10 @@ impl<A: Actor> ActorsManager<A> {
         }
     }
 
-    pub async fn end(&self) {
+    /*pub async fn end(&self) {
         for actor in &self.actors {
             actor.end().await;
         }
-    }
+    }*/
 }
+

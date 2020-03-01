@@ -1,4 +1,4 @@
-use acteur::{System, Actor, Handle};
+use acteur::{System, Actor, Handle, Secretary};
 use async_std::task::block_on;
 use async_trait::async_trait;
 
@@ -21,7 +21,7 @@ pub fn start() {
 
         println!("Waiting...");
 
-        //async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
 
         println!("All messages sent!");
     });
@@ -52,8 +52,13 @@ impl Actor for TestActor {
 
 #[async_trait]
 impl Handle<TestMessage> for TestActor {
-    async fn handle(&mut self, message: TestMessage) {
+    async fn handle(&mut self, message: TestMessage, secretary: Secretary) {
         println!("{:?}", message.field);
+        
+        secretary.send::<TestActor, TestMessage>(TestMessage {
+            field: "yay!".to_string(),
+        }).await;
+
         self.id = message.field;
     }
 }

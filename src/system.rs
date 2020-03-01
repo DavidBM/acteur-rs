@@ -1,3 +1,5 @@
+use async_std::sync::Arc;
+use crate::envelope::Envelope;
 use crate::Actor;
 use crate::actors_manager::ActorsManager;
 use crate::Handle;
@@ -5,15 +7,18 @@ use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
+use async_std::sync::Sender;
 
 pub struct System {
-    actor_managers: DashMap<TypeId, Box<dyn Any>>,
+    actor_managers: DashMap<TypeId, Box<dyn Any + Send>>,
+    address_book: AddressBook,
 }
 
 impl System {
     pub fn new() -> System {
         System {
             actor_managers: DashMap::new(),
+            address_book: AddressBook::new(),
         }
     }
 
@@ -44,7 +49,7 @@ impl System {
     async fn add<A: Actor>(&self, id: A::Id) {
         let type_id = TypeId::of::<A>();
 
-        let mut manager = ActorsManager::<A>::new().await;
+        let mut manager = ActorsManager::<A>::new(self.address_book.clone()).await;
 
         manager.add(id).await;
 
@@ -58,3 +63,47 @@ impl Debug for System {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct AddressBook {
+    senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>
+}
+
+impl AddressBook {
+    pub fn new() -> AddressBook {
+        AddressBook {
+            senders: Arc::new(DashMap::new()),
+        }
+    }
+
+    pub async fn get<A>(&self) -> Sender<Box<dyn Envelope<Actor = A>>>
+    where
+        A: Actor
+    {
+        let type_id = TypeId::of::<A>();
+
+        let mut sender = match self.senders.get_mut(&type_id) {
+            Some(manager) => manager,
+            //TODO: Implement the create Actor manager in the system
+            None => unreachable!(),
+        };
+
+        match sender.downcast_mut::<Sender<Box<dyn Envelope<Actor = A>>>>() {
+            Some(sender) => sender.clone(),
+            None => unreachable!(),
+        }
+    }
+
+    pub async fn add<A: Actor>(&self, sender: Sender<Box<dyn Envelope<Actor = A>>>) {
+        let type_id = TypeId::of::<A>();
+
+        self.senders.insert(type_id, Box::new(sender));
+    }
+}
+
+impl Clone for AddressBook {
+    fn clone(&self) -> Self {
+        AddressBook {
+            senders: self.senders.clone(),
+        }
+    }
+}
