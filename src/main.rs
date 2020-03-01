@@ -1,5 +1,4 @@
 use acteur::{System, Actor, Handle, Secretary};
-use async_std::task::block_on;
 use async_trait::async_trait;
 
 fn main() {
@@ -7,29 +6,28 @@ fn main() {
 }
 
 pub fn start() {
-    block_on(async {
-        let sys = System::new();
+    let sys = System::new();
 
-        for i in 0..1 {
-            let message = TestMessage {
-                field: i.to_string(),
-            };
+    for i in 0..1u32 {
+        let message = TestMessage {
+            field: i,
+        };
 
-            sys.send::<TestActor, TestMessage>(43.to_string(), message)
-                .await;
-        }
+        sys.send::<TestActor, TestMessage>(43.to_string(), message);
+    }
 
-        println!("Waiting...");
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
-        async_std::task::sleep(std::time::Duration::from_secs(1)).await;
+    //println!("Waiting...");
 
-        println!("All messages sent!");
-    });
+    sys.block();
+
+    //println!("All messages sent!");
 }
 
 #[derive(Debug)]
 struct TestMessage {
-    pub field: String,
+    pub field: u32,
 }
 
 #[derive(Debug)]
@@ -43,6 +41,7 @@ impl Actor for TestActor {
     type Id = String;
 
     async fn activate(id: Self::Id) -> Self {
+        //println!("Actor {} reporting sir!", id);
         TestActor {
             id: id.to_string(),
             values: std::collections::HashMap::new(),
@@ -53,12 +52,14 @@ impl Actor for TestActor {
 #[async_trait]
 impl Handle<TestMessage> for TestActor {
     async fn handle(&mut self, message: TestMessage, secretary: Secretary) {
-        println!("{:?}", message.field);
+        //println!("I'm actor {} and I'm sending a message for actor {}", self.id, message.field);
         
-        secretary.send::<TestActor, TestMessage>(TestMessage {
-            field: "yay!".to_string(),
-        }).await;
+        if message.field > 100 {
+            panic!();
+        }
 
-        self.id = message.field;
+        secretary.send::<TestActor, TestMessage>((message.field + 1).to_string(), TestMessage {
+            field: message.field + 1,
+        }).await;
     }
 }

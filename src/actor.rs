@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 #[async_trait]
-pub trait Actor: Debug + Send + 'static {
-    type Id: Eq + Hash + Send + Clone + Debug;
+pub trait Actor: Debug + Send  + Sync + 'static {
+    type Id: Eq + Hash + Send + Sync + Clone + Debug;
 
     async fn activate(id: Self::Id) -> Self;
 

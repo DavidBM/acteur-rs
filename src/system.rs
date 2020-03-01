@@ -1,8 +1,11 @@
+use std::marker::PhantomData;
+use async_std::task::spawn;
+use crate::handle::Handle;
+use crate::actors_manager::ActorManagerProxyCommand;
 use async_std::sync::Arc;
-use crate::envelope::Envelope;
-use crate::Actor;
 use crate::actors_manager::ActorsManager;
-use crate::Handle;
+use crate::envelope::ManagerLetter;
+use crate::Actor;
 use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
@@ -10,50 +13,30 @@ use std::fmt::Debug;
 use async_std::sync::Sender;
 
 pub struct System {
-    actor_managers: DashMap<TypeId, Box<dyn Any + Send>>,
     address_book: AddressBook,
 }
 
 impl System {
     pub fn new() -> System {
-        System {
-            actor_managers: DashMap::new(),
-            address_book: AddressBook::new(),
+        let address_book = AddressBook::new();
+        System { address_book }
+    }
+
+    pub fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(&self, actor_id: A::Id, message: M) {
+        match self.address_book.get::<A>() {
+            Some(sender) => {
+                spawn(async move {
+                    sender.send(ActorManagerProxyCommand::Dispatch(Box::new(ManagerLetter::new(actor_id, message)))).await;
+                });
+            },
+            None => {}
         }
     }
 
-    pub async fn send<A, M>(&self, id: A::Id, message: M)
-    where
-        A: Actor + Handle<M>,
-        M: 'static + Send + Debug,
-    {
-        let type_id = TypeId::of::<A>();
-
-        let mut manager = match self.actor_managers.get_mut(&type_id) {
-            Some(manager) => manager,
-            None => {
-                self.add::<A>(id.clone()).await;
-                match self.actor_managers.get_mut(&type_id) {
-                    Some(manager) => manager,
-                    None => unreachable!(),
-                }
-            }
-        };
-
-        match manager.downcast_mut::<ActorsManager<A>>() {
-            Some(manager) => manager.send(id, message).await,
-            None => unreachable!(),
-        };
-    }
-
-    async fn add<A: Actor>(&self, id: A::Id) {
-        let type_id = TypeId::of::<A>();
-
-        let mut manager = ActorsManager::<A>::new(self.address_book.clone()).await;
-
-        manager.add(id).await;
-
-        self.actor_managers.insert(type_id, Box::new(manager));
+    pub fn block(&self) {
+        async_std::task::block_on(async {
+            async_std::future::pending::<()>().await;
+        });
     }
 }
 
@@ -63,9 +46,18 @@ impl Debug for System {
     }
 }
 
+impl Clone for System {
+    fn clone(&self) -> Self {
+        System {
+            address_book: self.address_book.clone(),
+        }
+    }
+}
+
+
 #[derive(Debug)]
 pub(crate) struct AddressBook {
-    senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>
+    senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
 }
 
 impl AddressBook {
@@ -75,7 +67,7 @@ impl AddressBook {
         }
     }
 
-    pub async fn get<A>(&self) -> Sender<Box<dyn Envelope<Actor = A>>>
+    pub fn get<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
     where
         A: Actor
     {
@@ -83,20 +75,38 @@ impl AddressBook {
 
         let mut sender = match self.senders.get_mut(&type_id) {
             Some(manager) => manager,
-            //TODO: Implement the create Actor manager in the system
-            None => unreachable!(),
+            None => {
+                self.create::<A>();
+                match self.senders.get_mut(&type_id) {
+                    Some(manager) => manager,
+                    None => unreachable!(),
+                }
+            },
         };
 
-        match sender.downcast_mut::<Sender<Box<dyn Envelope<Actor = A>>>>() {
-            Some(sender) => sender.clone(),
+        match sender.downcast_mut::<Sender<ActorManagerProxyCommand<A>>>() {
+            Some(sender) => Some(sender.clone()),
             None => unreachable!(),
         }
     }
 
-    pub async fn add<A: Actor>(&self, sender: Sender<Box<dyn Envelope<Actor = A>>>) {
+    pub fn add<A: Actor>(&self, sender: Sender<ActorManagerProxyCommand<A>>) {
         let type_id = TypeId::of::<A>();
 
         self.senders.insert(type_id, Box::new(sender));
+    }
+
+    pub fn create<A: Actor>(&self) {
+        ActorsManager::<A>::new(self.clone());
+    }
+
+    pub fn stop_all(&self) {
+        for _sender in self.senders.iter() {
+            //TODO: Find the way to send a typed message to all ActorManagers
+            // Provably once the async_std channels can have try_recv (as it will allow
+            // to have two queues, one for messages, other for special commands)
+            //sender.send(ActorManagerProxyCommand::End);
+        }
     }
 }
 
@@ -106,4 +116,9 @@ impl Clone for AddressBook {
             senders: self.senders.clone(),
         }
     }
+}
+
+#[derive(Debug)]
+struct ManagerRepresentant<A: Actor> {
+    phantom: PhantomData<A>
 }
