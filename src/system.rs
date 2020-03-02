@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use crate::actors_manager::Manager;
 use async_std::task::spawn;
 use crate::handle::Handle;
 use crate::actors_manager::ActorManagerProxyCommand;
@@ -33,6 +33,10 @@ impl System {
         }
     }
 
+    pub fn stop(&self) {
+        self.address_book.stop_all();
+    }
+
     pub fn block(&self) {
         async_std::task::block_on(async {
             async_std::future::pending::<()>().await;
@@ -58,12 +62,14 @@ impl Clone for System {
 #[derive(Debug)]
 pub(crate) struct AddressBook {
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
+    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
 }
 
 impl AddressBook {
     pub fn new() -> AddressBook {
         AddressBook {
             senders: Arc::new(DashMap::new()),
+            managers: Arc::new(DashMap::new()),
         }
     }
 
@@ -97,15 +103,14 @@ impl AddressBook {
     }
 
     pub fn create<A: Actor>(&self) {
-        ActorsManager::<A>::new(self.clone());
+        let manager = ActorsManager::<A>::new(self.clone());
+        let type_id = TypeId::of::<A>();
+        self.managers.insert(type_id, Box::new(manager));
     }
 
     pub fn stop_all(&self) {
-        for _sender in self.senders.iter() {
-            //TODO: Find the way to send a typed message to all ActorManagers
-            // Provably once the async_std channels can have try_recv (as it will allow
-            // to have two queues, one for messages, other for special commands)
-            //sender.send(ActorManagerProxyCommand::End);
+        for manager in self.managers.iter() {
+            manager.end();
         }
     }
 }
@@ -114,11 +119,8 @@ impl Clone for AddressBook {
     fn clone(&self) -> Self {
         AddressBook {
             senders: self.senders.clone(),
+            managers: self.managers.clone(),
         }
     }
 }
 
-#[derive(Debug)]
-struct ManagerRepresentant<A: Actor> {
-    phantom: PhantomData<A>
-}

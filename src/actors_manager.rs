@@ -1,19 +1,20 @@
-use async_std::sync::Arc;
 use async_std::task::spawn;
-use async_std::sync::channel;
-use async_std::sync::Sender;
-use async_std::sync::Receiver;
+use async_std::sync::{Arc, channel, Sender, Receiver};
 use crate::envelope::ManagerEnvelope;
 use crate::system::AddressBook;
-use crate::actor::Actor;
+use crate::Actor;
 use crate::actor_proxy::ActorProxy;
 use dashmap::DashMap;
 use std::fmt::Debug;
 
+pub(crate) trait Manager: Send + Sync + Debug {
+    fn end(&self);
+}
+
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
-    End,
+    End
 }
 
 #[derive(Debug)]
@@ -35,28 +36,37 @@ impl<A: Actor> ActorsManager<A> {
             let actors = actors.clone();
 
             spawn(async move {
-                while let Some(command) = receiver.recv().await {
-                    //println!("Hey yo! There are {} actors alive!", actors.len());
-                    match command {
-                        ActorManagerProxyCommand::Dispatch(mut command) => {
-                            let actor_id = command.get_actor_id();
+                loop {
 
-                            if let Some(mut actor) = actors.get_mut(&actor_id) {
-                                command.dispatch(&mut actor);
-                                continue;
-                            }
+                    match receiver.recv().await{
+                        Some(command) => {
+                            //println!("Hey yo! There are {} actors alive!", actors.len());
+                            match command {
+                                ActorManagerProxyCommand::Dispatch(mut command) => {
+                                    let actor_id = command.get_actor_id();
 
-                            let actor = ActorProxy::<A>::new(address_book.clone(), actor_id.clone());
-                            actors.insert(actor_id.clone(), actor);
+                                    if let Some(mut actor) = actors.get_mut(&actor_id) {
+                                        command.dispatch(&mut actor);
+                                        continue;
+                                    }
 
-                            match actors.get_mut(&actor_id) {
-                                Some(mut actor) => {
-                                    command.dispatch(&mut actor);
+                                    let actor = ActorProxy::<A>::new(address_book.clone(), actor_id.clone());
+                                    actors.insert(actor_id.clone(), actor);
+
+                                    match actors.get_mut(&actor_id) {
+                                        Some(mut actor) => {
+                                            command.dispatch(&mut actor);
+                                        },
+                                        None => unreachable!(),
+                                    }
                                 },
-                                None => unreachable!(),
+                                ActorManagerProxyCommand::End => {
+                                    println!("YOLO!");
+                                    break
+                                },
                             }
-                        },  
-                        ActorManagerProxyCommand::End => break,
+                        },
+                        _ => ()
                     }
                 }
             });
@@ -64,14 +74,29 @@ impl<A: Actor> ActorsManager<A> {
 
         ActorsManager {
             actors,
-            sender
+            sender,
         }
     }
 
-    /*pub async fn end(&self) {
-        for actor in &self.actors {
-            actor.end().await;
-        }
-    }*/
+    pub fn end(&self) {
+        let sender = self.sender.clone();
+        spawn(async move {
+            sender.send(ActorManagerProxyCommand::End).await;
+        });
+    }
 }
 
+impl <A: Actor>Clone for ActorsManager<A> {
+    fn clone(&self) -> Self {
+        ActorsManager {
+            actors: self.actors.clone(),
+            sender: self.sender.clone(),
+        }
+    }
+}
+
+impl <A: Actor>Manager for ActorsManager<A> {
+    fn end(&self) {
+        ActorsManager::<A>::end(self);
+    }
+}

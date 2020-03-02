@@ -18,6 +18,8 @@ pub fn start() {
 
     std::thread::sleep(std::time::Duration::from_secs(2));
 
+    //sys.stop();
+
     //println!("Waiting...");
 
     sys.block();
@@ -53,11 +55,9 @@ impl Actor for TestActor {
 impl Handle<TestMessage> for TestActor {
     async fn handle(&mut self, message: TestMessage, secretary: Secretary) {
         //println!("I'm actor {} and I'm sending a message for actor {}", self.id, message.field);
-        
-        if message.field > 100 {
+        if message.field > 1_000_000 {
             panic!();
         }
-
         secretary.send::<TestActor, TestMessage>((message.field + 1).to_string(), TestMessage {
             field: message.field + 1,
         }).await;
