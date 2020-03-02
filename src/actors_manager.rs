@@ -38,7 +38,6 @@ impl<A: Actor> ActorsManager<A> {
 
             spawn(async move {
                 loop {
-
                     match receiver.recv().await{
                         Some(command) => {
                             match command {
@@ -61,9 +60,13 @@ impl<A: Actor> ActorsManager<A> {
                                     }
                                 },
                                 ActorManagerProxyCommand::End => {
+                                    // If there are any message left, we postpone the shutdown.
                                     if receiver.len() > 0 {
                                         sender.send(ActorManagerProxyCommand::End).await;
                                     } else {
+                                        for actor in actors.iter() {
+                                            actor.end().await;
+                                        }
                                         break
                                     }
                                 },

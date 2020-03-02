@@ -33,6 +33,7 @@ impl<A: Actor> ActorProxy<A> {
 
         {
             let secretary = secretary.clone();
+            let sender = sender.clone();
 
             spawn(async move {
                 let mut actor = A::activate(id).await;
@@ -40,10 +41,17 @@ impl<A: Actor> ActorProxy<A> {
                 spawn(async move {
                     while let Some(command) = receiver.recv().await {
                         match command {
-                            ActorProxyCommand::End => break,
                             ActorProxyCommand::Dispatch(mut envelope) => {
                                 envelope.dispatch(&mut actor, secretary.clone()).await
-                            }
+                            },
+                            ActorProxyCommand::End => {
+                                // If there are any message left, we postpone the shutdown.
+                                if receiver.len() > 0 {
+                                    sender.send(ActorProxyCommand::End).await;
+                                } else {
+                                    break
+                                }
+                            },
                         }
                     }
                 });
@@ -73,9 +81,9 @@ impl<A: Actor> ActorProxy<A> {
         });
     }
 
-    /*pub async fn end(&self) {
+    pub async fn end(&self) {
         self.sender.send(ActorProxyCommand::End).await;
-    }*/
+    }
 }
 
 pub struct Secretary {
