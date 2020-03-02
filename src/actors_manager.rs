@@ -34,13 +34,13 @@ impl<A: Actor> ActorsManager<A> {
 
         {
             let actors = actors.clone();
+            let sender = sender.clone();
 
             spawn(async move {
                 loop {
 
                     match receiver.recv().await{
                         Some(command) => {
-                            //println!("Hey yo! There are {} actors alive!", actors.len());
                             match command {
                                 ActorManagerProxyCommand::Dispatch(mut command) => {
                                     let actor_id = command.get_actor_id();
@@ -61,8 +61,11 @@ impl<A: Actor> ActorsManager<A> {
                                     }
                                 },
                                 ActorManagerProxyCommand::End => {
-                                    println!("YOLO!");
-                                    break
+                                    if receiver.len() > 0 {
+                                        sender.send(ActorManagerProxyCommand::End).await;
+                                    } else {
+                                        break
+                                    }
                                 },
                             }
                         },
