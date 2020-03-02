@@ -1,7 +1,5 @@
-use crate::actor_proxy::ActorProxy;
-use crate::actor::Actor;
-use crate::actor_proxy::Secretary;
-use crate::handle::Handle;
+use crate::actor_proxy::{ActorProxy, Secretary};
+use crate::{Actor, Handle};
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -31,12 +29,9 @@ impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
     }
 
     pub async fn dispatch(&mut self, actor: &mut A, secretary: Secretary) {
-        match self.message.take() {
-            Some(message) => {
-                <A as Handle<M>>::handle(actor, message, secretary).await;
-            }
-            None => (),
-        };
+        if let Some(message) = self.message.take() {
+            <A as Handle<M>>::handle(actor, message, secretary).await;
+        }
     }
 }
 
@@ -52,10 +47,7 @@ impl<A: Actor + Handle<M>, M: Send + Debug> Envelope for Letter<A, M> {
 pub(crate) trait ManagerEnvelope: Send + Debug {
     type Actor: Actor;
 
-    fn dispatch(
-        &mut self,
-        manager: &mut ActorProxy<Self::Actor>,
-    );
+    fn dispatch(&mut self, manager: &mut ActorProxy<Self::Actor>);
 
     fn get_actor_id(&self) -> <<Self as ManagerEnvelope>::Actor as Actor>::Id;
 }
@@ -84,22 +76,16 @@ impl<A: Handle<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
     }
 
     pub fn dispatch(&mut self, manager: &mut ActorProxy<A>) {
-        match self.message.take() {
-            Some(message) => {
-                manager.send(message);
-            }
-            None => (),
-        };
+        if let Some(message) = self.message.take() {
+            manager.send(message);
+        }
     }
 }
 
 impl<A: Actor + Handle<M>, M: 'static + Send + Debug> ManagerEnvelope for ManagerLetter<A, M> {
     type Actor = A;
 
-    fn dispatch(
-        &mut self,
-        manager: &mut ActorProxy<Self::Actor>,
-    ) {
+    fn dispatch(&mut self, manager: &mut ActorProxy<Self::Actor>) {
         ManagerLetter::<A, M>::dispatch(self, manager)
     }
 

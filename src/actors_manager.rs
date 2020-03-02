@@ -1,9 +1,11 @@
-use async_std::task::spawn;
-use async_std::sync::{Arc, channel, Sender, Receiver};
+use crate::actor_proxy::ActorProxy;
 use crate::envelope::ManagerEnvelope;
 use crate::system::AddressBook;
 use crate::Actor;
-use crate::actor_proxy::ActorProxy;
+use async_std::{
+    sync::{channel, Arc, Receiver, Sender},
+    task::spawn,
+};
 use dashmap::DashMap;
 use std::fmt::Debug;
 
@@ -14,7 +16,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
-    End
+    End,
 }
 
 #[derive(Debug)]
@@ -25,8 +27,10 @@ pub(crate) struct ActorsManager<A: Actor> {
 
 impl<A: Actor> ActorsManager<A> {
     pub fn new(address_book: AddressBook) -> ActorsManager<A> {
-        let (sender, receiver): (Sender<ActorManagerProxyCommand<A>>, Receiver<ActorManagerProxyCommand<A>>) =
-            channel(150_000);
+        let (sender, receiver): (
+            Sender<ActorManagerProxyCommand<A>>,
+            Receiver<ActorManagerProxyCommand<A>>,
+        ) = channel(150_000);
 
         address_book.add(sender.clone());
 
@@ -38,50 +42,45 @@ impl<A: Actor> ActorsManager<A> {
 
             spawn(async move {
                 loop {
-                    match receiver.recv().await{
-                        Some(command) => {
-                            match command {
-                                ActorManagerProxyCommand::Dispatch(mut command) => {
-                                    let actor_id = command.get_actor_id();
+                    if let Some(command) = receiver.recv().await {
+                        match command {
+                            ActorManagerProxyCommand::Dispatch(mut command) => {
+                                let actor_id = command.get_actor_id();
 
-                                    if let Some(mut actor) = actors.get_mut(&actor_id) {
+                                if let Some(mut actor) = actors.get_mut(&actor_id) {
+                                    command.dispatch(&mut actor);
+                                    continue;
+                                }
+
+                                let actor =
+                                    ActorProxy::<A>::new(address_book.clone(), actor_id.clone());
+                                actors.insert(actor_id.clone(), actor);
+
+                                match actors.get_mut(&actor_id) {
+                                    Some(mut actor) => {
                                         command.dispatch(&mut actor);
-                                        continue;
                                     }
-
-                                    let actor = ActorProxy::<A>::new(address_book.clone(), actor_id.clone());
-                                    actors.insert(actor_id.clone(), actor);
-
-                                    match actors.get_mut(&actor_id) {
-                                        Some(mut actor) => {
-                                            command.dispatch(&mut actor);
-                                        },
-                                        None => unreachable!(),
-                                    }
-                                },
-                                ActorManagerProxyCommand::End => {
-                                    // If there are any message left, we postpone the shutdown.
-                                    if receiver.len() > 0 {
-                                        sender.send(ActorManagerProxyCommand::End).await;
-                                    } else {
-                                        for actor in actors.iter() {
-                                            actor.end().await;
-                                        }
-                                        break
-                                    }
-                                },
+                                    None => unreachable!(),
+                                }
                             }
-                        },
-                        _ => ()
+                            ActorManagerProxyCommand::End => {
+                                // If there are any message left, we postpone the shutdown.
+                                if !receiver.is_empty() {
+                                    sender.send(ActorManagerProxyCommand::End).await;
+                                } else {
+                                    for actor in actors.iter() {
+                                        actor.end().await;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             });
         }
 
-        ActorsManager {
-            actors,
-            sender,
-        }
+        ActorsManager { actors, sender }
     }
 
     pub fn end(&self) {
@@ -92,7 +91,7 @@ impl<A: Actor> ActorsManager<A> {
     }
 }
 
-impl <A: Actor>Clone for ActorsManager<A> {
+impl<A: Actor> Clone for ActorsManager<A> {
     fn clone(&self) -> Self {
         ActorsManager {
             actors: self.actors.clone(),
@@ -101,7 +100,7 @@ impl <A: Actor>Clone for ActorsManager<A> {
     }
 }
 
-impl <A: Actor>Manager for ActorsManager<A> {
+impl<A: Actor> Manager for ActorsManager<A> {
     fn end(&self) {
         ActorsManager::<A>::end(self);
     }

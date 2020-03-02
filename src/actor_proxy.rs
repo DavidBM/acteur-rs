@@ -1,16 +1,12 @@
 use crate::actors_manager::ActorManagerProxyCommand;
-use crate::envelope::Envelope;
-use crate::envelope::Letter;
-use crate::envelope::ManagerLetter;
-use crate::handle::Handle;
+use crate::envelope::{Envelope, Letter, ManagerLetter};
 use crate::system::AddressBook;
-use async_std::sync::channel;
-use async_std::sync::Receiver;
-use async_std::sync::Sender;
-use async_std::task::spawn;
+use crate::{Actor, Handle};
+use async_std::{
+    sync::{channel, Receiver, Sender},
+    task::spawn,
+};
 use std::fmt::Debug;
-
-use crate::actor::Actor;
 
 #[derive(Debug)]
 enum ActorProxyCommand<A: Actor> {
@@ -43,15 +39,15 @@ impl<A: Actor> ActorProxy<A> {
                         match command {
                             ActorProxyCommand::Dispatch(mut envelope) => {
                                 envelope.dispatch(&mut actor, secretary.clone()).await
-                            },
+                            }
                             ActorProxyCommand::End => {
                                 // If there are any message left, we postpone the shutdown.
-                                if receiver.len() > 0 {
+                                if !receiver.is_empty() {
                                     sender.send(ActorProxyCommand::End).await;
                                 } else {
-                                    break
+                                    break;
                                 }
-                            },
+                            }
                         }
                     }
                 });
