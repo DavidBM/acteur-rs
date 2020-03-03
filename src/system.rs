@@ -6,8 +6,12 @@ use async_std::{
     task::spawn,
 };
 use dashmap::DashMap;
+use futures::task::AtomicWaker;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 pub struct System {
     address_book: AddressBook,
@@ -47,7 +51,7 @@ impl System {
 
     pub fn block(&self) {
         async_std::task::block_on(async {
-            async_std::future::pending::<()>().await;
+            WaitSystemStop::new(self.address_book.clone()).await;
         });
     }
 }
@@ -70,6 +74,7 @@ impl Clone for System {
 pub(crate) struct AddressBook {
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
+    waker_for_sopped_manager: Arc<AtomicWaker>,
 }
 
 impl AddressBook {
@@ -77,6 +82,7 @@ impl AddressBook {
         AddressBook {
             senders: Arc::new(DashMap::new()),
             managers: Arc::new(DashMap::new()),
+            waker_for_sopped_manager: Arc::new(AtomicWaker::new()),
         }
     }
 
@@ -121,6 +127,10 @@ impl AddressBook {
             manager.end();
         }
     }
+
+    pub(crate) fn count_actor_managers(&self) -> usize {
+        self.managers.len()
+    }
 }
 
 impl Clone for AddressBook {
@@ -128,6 +138,28 @@ impl Clone for AddressBook {
         AddressBook {
             senders: self.senders.clone(),
             managers: self.managers.clone(),
+            waker_for_sopped_manager: self.waker_for_sopped_manager.clone(),
+        }
+    }
+}
+
+struct WaitSystemStop(AddressBook);
+
+impl WaitSystemStop {
+    pub fn new(system: AddressBook) -> WaitSystemStop {
+        WaitSystemStop(system)
+    }
+}
+
+impl Future for WaitSystemStop {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        if self.0.count_actor_managers() > 0 {
+            self.0.waker_for_sopped_manager.register(cx.waker());
+            Poll::Pending
+        } else {
+            Poll::Ready(())
         }
     }
 }
