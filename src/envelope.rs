@@ -1,5 +1,5 @@
-use crate::actor_proxy::{ActorProxy, Secretary};
-use crate::{Actor, Handle};
+use crate::actor_proxy::ActorProxy;
+use crate::{Actor, Assistant, Handle};
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 pub(crate) trait Envelope: Send + Debug {
     type Actor: Actor;
 
-    async fn dispatch(&mut self, actor: &mut Self::Actor, secretary: Secretary);
+    async fn dispatch(&mut self, actor: &mut Self::Actor, assistant: Assistant);
 }
 
 #[derive(Debug)]
@@ -28,9 +28,9 @@ impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
         }
     }
 
-    pub async fn dispatch(&mut self, actor: &mut A, secretary: Secretary) {
+    pub async fn dispatch(&mut self, actor: &mut A, assistant: Assistant) {
         if let Some(message) = self.message.take() {
-            <A as Handle<M>>::handle(actor, message, secretary).await;
+            <A as Handle<M>>::handle(actor, message, assistant).await;
         }
     }
 }
@@ -39,8 +39,8 @@ impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
 impl<A: Actor + Handle<M>, M: Send + Debug> Envelope for Letter<A, M> {
     type Actor = A;
 
-    async fn dispatch(&mut self, actor: &mut A, secretary: Secretary) {
-        Letter::<A, M>::dispatch(self, actor, secretary).await
+    async fn dispatch(&mut self, actor: &mut A, assistant: Assistant) {
+        Letter::<A, M>::dispatch(self, actor, assistant).await
     }
 }
 

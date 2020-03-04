@@ -13,6 +13,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+/// The system is external inteface to the actor runtime.
+/// It allow to send messages, to stop it, configure it, etc.
+/// Once you contructed with the method "new" you can start sending messages.
+/// The system will automatically start any required actor automatically and unload them when required.
 pub struct System {
     address_book: AddressBook,
 }
@@ -24,11 +28,15 @@ impl Default for System {
 }
 
 impl System {
+    /// Initializes the system. After this, you can send messages using the send method.
     pub fn new() -> System {
         let address_book = AddressBook::new();
         System { address_book }
     }
 
+    /// Sends a message to an actor with an ID.
+    /// If the actor is not loaded in Ram, this method will load them first
+    /// by calling their "activate" method.
     pub fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
@@ -45,11 +53,16 @@ impl System {
         }
     }
 
+    /// Send an stop message to all actors in the system.
+    /// Actors will process all the enqued messages before stop
     pub fn stop(&self) {
         self.address_book.stop_all();
     }
 
-    pub fn block(&self) {
+    /// Waits until all actors are stopped.
+    /// If you call "system.stop()" this method will wait untill all actor
+    /// have consumed all messages before returning.
+    pub fn wait_until_stopped(&self) {
         async_std::task::block_on(async {
             WaitSystemStop::new(self.address_book.clone()).await;
         });
@@ -78,7 +91,7 @@ pub(crate) struct AddressBook {
 }
 
 impl AddressBook {
-    pub fn new() -> AddressBook {
+    pub(crate) fn new() -> AddressBook {
         AddressBook {
             senders: Arc::new(DashMap::new()),
             managers: Arc::new(DashMap::new()),
@@ -86,7 +99,7 @@ impl AddressBook {
         }
     }
 
-    pub fn get<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
+    pub(crate) fn get<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
     where
         A: Actor,
     {
@@ -110,19 +123,17 @@ impl AddressBook {
         }
     }
 
-    pub fn add<A: Actor>(&self, sender: Sender<ActorManagerProxyCommand<A>>) {
+    pub(crate) fn create<A: Actor>(&self) {
+        let manager = ActorsManager::<A>::new(self.clone());
+        let sender = manager.get_sender();
+
         let type_id = TypeId::of::<A>();
 
         self.senders.insert(type_id, Box::new(sender));
-    }
-
-    pub fn create<A: Actor>(&self) {
-        let manager = ActorsManager::<A>::new(self.clone());
-        let type_id = TypeId::of::<A>();
         self.managers.insert(type_id, Box::new(manager));
     }
 
-    pub fn stop_all(&self) {
+    pub(crate) fn stop_all(&self) {
         for manager in self.managers.iter() {
             manager.end();
         }
