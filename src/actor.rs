@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-/// The mail Trait from this crate.
+/// The main Trait from this crate.
 ///
 /// This this Trait you define enable your structs to be used as actors.
 /// You will need to use [`Handle`](./trait.Handle.html) Trait in order to accept messages.

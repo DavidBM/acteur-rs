@@ -81,19 +81,47 @@ fn actor_loop<A: Actor>(
                         envelope.dispatch(&mut actor, assistant.clone()).await
                     }
                     ActorProxyCommand::End => {
-                        // If there are any message left, we postpone the shutdown.
-                        if !sender.is_empty() {
-                            // TODO: Check if the actor is already scheduled to stop in order to avoid
-                            // the case where 2 End mesages are in the channel
-                            sender.send(ActorProxyCommand::End).await;
-                        } else {
-                            actor.deactivate().await;
-                            report_sender.send(ActorProxyReport::ActorStopped(id)).await;
-                            break;
+                        // We may find cases where we can have several End command in a row. In that case,
+                        // we want to consume all the end command together until we find nothing or a not-end command
+                        match recv_until_not_end_command(receiver.clone()).await {
+                            None => {
+                                actor.deactivate().await;
+                                report_sender.send(ActorProxyReport::ActorStopped(id)).await;
+                                break;
+                            }
+                            Some(ActorProxyCommand::Dispatch(mut envelope)) => {
+                                // If there are any message left, we postpone the shutdown.
+                                sender.send(ActorProxyCommand::End).await;
+                                envelope.dispatch(&mut actor, assistant.clone()).await
+                            }
+                            _ => unreachable!(),
                         }
                     }
                 }
             }
         });
     });
+}
+
+async fn recv_until_not_end_command<A: Actor>(
+    receiver: Receiver<ActorProxyCommand<A>>,
+) -> Option<ActorProxyCommand<A>> {
+    if receiver.is_empty() {
+        return None;
+    }
+
+    while let Some(command) = receiver.recv().await {
+        match command {
+            ActorProxyCommand::Dispatch(_) => return Some(command),
+            ActorProxyCommand::End => {
+                if receiver.is_empty() {
+                    return None;
+                } else {
+                    continue;
+                }
+            }
+        }
+    }
+
+    None
 }

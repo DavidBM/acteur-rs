@@ -36,13 +36,13 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     let sys = System::new();
+//! # fn main() {
+//! let sys = System::new();
 //!
-//!     sys.send::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+//! sys.send::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 //!
-//!     sys.wait_until_stopped();
-//! }
+//! sys.wait_until_stopped();
+//! # }
 //!
 //! ```
 //!

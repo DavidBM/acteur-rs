@@ -83,47 +83,61 @@ fn actor_manager_loop<A: Actor>(
     spawn(async move {
         while let Some(command) = receiver.recv().await {
             match command {
-                ActorManagerProxyCommand::Dispatch(mut command) => {
-                    let actor_id = command.get_actor_id();
-
-                    if let Some(mut actor) = actors.get_mut(&actor_id) {
-                        command.dispatch(&mut actor);
-                        continue;
-                    }
-
-                    let actor = ActorProxy::<A>::new(
-                        address_book.clone(),
-                        actor_id.clone(),
-                        report_sender.clone(),
-                    );
-
-                    actors.insert(actor_id.clone(), actor);
-
-                    match actors.get_mut(&actor_id) {
-                        Some(mut actor) => {
-                            command.dispatch(&mut actor);
-                        }
-                        None => unreachable!(),
-                    }
+                ActorManagerProxyCommand::Dispatch(command) => {
+                    process_dispatch_command(command, &actors, &address_book, &report_sender);
                 }
                 ActorManagerProxyCommand::End => {
-                    // If there are any message left, we postpone the shutdown.
-                    if !receiver.is_empty() {
-                        // TODO: Check if the actor is already scheduled to stop in order to avoid
-                        // the case where 2 End mesages are in the channel
-                        sender.send(ActorManagerProxyCommand::End).await;
-                    } else {
-                        for actor in actors.iter() {
-                            actor.end().await;
-                        }
+                    // We may find cases where we can have several End command in a row. In that case,
+                    // we want to consume all the end command together until we find nothing or a not-end command
+                    match recv_until_not_end_command(receiver.clone()).await {
+                        None => {
+                            for actor in actors.iter() {
+                                actor.end().await;
+                            }
 
-                        report_sender.send(ActorProxyReport::AllActorsStopped).await;
-                        break;
+                            report_sender.send(ActorProxyReport::AllActorsStopped).await;
+                            break;
+                        }
+                        Some(ActorManagerProxyCommand::Dispatch(command)) => {
+                            // If there are any message left, we postpone the shutdown.
+                            sender.send(ActorManagerProxyCommand::End).await;
+                            process_dispatch_command(
+                                command,
+                                &actors,
+                                &address_book,
+                                &report_sender,
+                            );
+                        }
+                        _ => unreachable!(),
                     }
                 }
             }
         }
     });
+}
+
+fn process_dispatch_command<A: Actor>(
+    mut command: Box<dyn ManagerEnvelope<Actor = A>>,
+    actors: &Arc<DashMap<A::Id, ActorProxy<A>>>,
+    address_book: &AddressBook,
+    report_sender: &Sender<ActorProxyReport<A>>,
+) {
+    let actor_id = command.get_actor_id();
+
+    if let Some(mut actor) = actors.get_mut(&actor_id) {
+        command.dispatch(&mut actor);
+        return;
+    }
+
+    let mut actor = ActorProxy::<A>::new(
+        address_book.clone(),
+        actor_id.clone(),
+        report_sender.clone(),
+    );
+
+    command.dispatch(&mut actor);
+
+    actors.insert(actor_id, actor);
 }
 
 fn actor_proxy_report_loop<A: Actor>(
@@ -140,6 +154,29 @@ fn actor_proxy_report_loop<A: Actor>(
             }
         }
     });
+}
+
+async fn recv_until_not_end_command<A: Actor>(
+    receiver: Receiver<ActorManagerProxyCommand<A>>,
+) -> Option<ActorManagerProxyCommand<A>> {
+    if receiver.is_empty() {
+        return None;
+    }
+
+    while let Some(command) = receiver.recv().await {
+        match command {
+            ActorManagerProxyCommand::Dispatch(_) => return Some(command),
+            ActorManagerProxyCommand::End => {
+                if receiver.is_empty() {
+                    return None;
+                } else {
+                    continue;
+                }
+            }
+        }
+    }
+
+    None
 }
 
 impl<A: Actor> Clone for ActorsManager<A> {
