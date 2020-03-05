@@ -52,12 +52,12 @@ Regarding the implementation:
 ## Examples
 
 ```rust
-use acteur::{Actor, Handle, Assistant, System};
+use acteur::{Actor, Assistant, Handle, System};
 use async_trait::async_trait;
 
 #[derive(Debug)]
 struct Employee {
-    salary: u32
+    salary: u32,
 }
 
 #[async_trait]
@@ -66,7 +66,7 @@ impl Actor for Employee {
 
     async fn activate(_: Self::Id) -> Self {
         Employee {
-            salary: 0//Load from DB or set a default,
+            salary: 0, //Load from DB or set a default,
         }
     }
 }
@@ -86,8 +86,9 @@ fn main() {
 
     sys.send::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 
-    sys.block();
+    sys.wait_until_stopped();
 }
+
 ```
 
 ## License

@@ -44,6 +44,8 @@
 //!     sys.wait_until_stopped();
 //! }
 //!
+//! ```
+//!
 
 mod actor;
 mod actor_proxy;
