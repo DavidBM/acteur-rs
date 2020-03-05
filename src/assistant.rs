@@ -6,6 +6,71 @@ use std::fmt::Debug;
 
 /// This object is provided to the [Handle](./trait.Handle.html) method for each message that an Actor receives
 /// The Actor's assistant allows to send messages and to execute some task over the system.
+///
+/// ```rust,no_run
+/// # use acteur::{Actor, Handle, Assistant, System};
+/// # use async_trait::async_trait;
+/// #
+/// # #[derive(Debug)]
+/// # struct Employee {
+/// #     salary: u32,
+/// #     manager_id: u32,
+/// # }
+/// #
+/// # #[async_trait]
+/// # impl Actor for Employee {
+/// #     type Id = u32;
+/// #
+/// #     async fn activate(_: Self::Id) -> Self {
+/// #         Employee {
+/// #             salary: 0, // Load from DB or set a default,
+/// #             manager_id: 0 ,
+/// #         }
+/// #     }
+/// # }
+/// #
+/// # #[derive(Debug)]
+/// # struct Manager;
+/// #
+/// # #[async_trait]
+/// # impl Actor for Manager {
+/// #     type Id = u32;
+/// #
+/// #     async fn activate(_: Self::Id) -> Self {
+/// #         Manager
+/// #     }
+/// # }
+/// # #[async_trait]
+/// # impl Handle<SayByeForever> for Manager {
+/// #     async fn handle(&mut self, message: SayByeForever, assistant: Assistant) {}
+/// # }
+/// #[derive(Debug)]
+/// struct SalaryChanged(u32);
+///
+/// #[derive(Debug)]
+/// struct SayByeForever(String);
+///
+/// #[async_trait]
+/// impl Handle<SalaryChanged> for Employee {
+///     async fn handle(&mut self, message: SalaryChanged, assistant: Assistant) {
+///         if self.salary > message.0 {
+///             assistant.send::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
+///         }
+///         
+///         self.salary = message.0;
+///     }
+/// }
+///
+/// # fn main() {
+/// #     let sys = System::new();
+/// #
+/// #     sys.send::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+/// #
+/// #     sys.wait_until_stopped();
+/// # }
+///
+/// ```
+///
 pub struct Assistant {
     address_book: AddressBook,
 }
