@@ -1,6 +1,25 @@
-# Acteur Actor System
+<h1 align="center">Acteur Actor System</h1>
+<div align="center">
+ <strong>
+   An actor system written in Rust that just works. Simple, robust, fast, documented.
+ </strong>
+</div>
 
-An actor system written in Rust that just works. Simple, robust, fast, documented.
+<br />
+
+<div align="center">
+  <!-- Crates version -->
+  <a href="https://crates.io/crates/acteur">
+    <img src="https://img.shields.io/crates/v/acteur.svg?style=flat-square"
+    alt="Crates.io version" />
+  </a>
+  <!-- docs.rs docs -->
+  <a href="https://docs.rs/acteur">
+    <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+      alt="docs.rs docs" />
+  </a>
+</div>
+
 
 ## Main Features
 
