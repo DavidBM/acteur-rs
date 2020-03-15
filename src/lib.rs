@@ -31,7 +31,7 @@
 //!
 //! #[async_trait]
 //! impl Handle<SalaryChanged> for Employee {
-//!     async fn handle(&mut self, message: SalaryChanged, _: Assistant) {
+//!     async fn handle(&mut self, message: SalaryChanged, _: Assistant<Employee>) {
 //!         self.salary = message.0;
 //!     }
 //! }
