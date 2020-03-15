@@ -1,6 +1,6 @@
 use crate::actors_manager::ActorManagerProxyCommand;
 use crate::envelope::ManagerLetter;
-use crate::system::AddressBook;
+use crate::address_book::AddressBook;
 use crate::{Actor, Handle};
 use std::fmt::Debug;
 

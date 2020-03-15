@@ -53,6 +53,7 @@ mod actors_manager;
 mod assistant;
 mod envelope;
 mod handle;
+mod address_book;
 mod system;
 
 pub use actor::Actor;

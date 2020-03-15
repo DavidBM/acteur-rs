@@ -1,6 +1,6 @@
 use crate::actor_proxy::ActorProxy;
 use crate::envelope::ManagerEnvelope;
-use crate::system::AddressBook;
+use crate::address_book::{AddressBook, ActorManagerReport};
 use crate::Actor;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
@@ -9,7 +9,6 @@ use async_std::{
 use std::any::TypeId;
 use dashmap::DashMap;
 use std::fmt::Debug;
-use crate::system::ActorManagerReport;
 
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
