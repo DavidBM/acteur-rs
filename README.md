@@ -44,9 +44,10 @@ Regarding the implementation:
 - [x] System can send messages to any actor
 - [ ] System statistics
 - [ ] Automatic deallocation of unused actors
-- [ ] Stop waits for all actors to consume all messages
+- [x] Stop waits for all actors to consume all messages
 - [ ] Subscribe to message
 - [ ] Fan-out messages
+- [ ] Actor self stop
 - [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 
 ## Examples

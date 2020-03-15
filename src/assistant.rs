@@ -1,6 +1,6 @@
 use crate::actors_manager::ActorManagerProxyCommand;
-use crate::envelope::ManagerLetter;
 use crate::address_book::AddressBook;
+use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
 use std::fmt::Debug;
 
@@ -71,27 +71,41 @@ use std::fmt::Debug;
 ///
 /// ```
 ///
-pub struct Assistant {
+pub struct Assistant<A: Actor> {
     address_book: AddressBook,
+    actor_id: A::Id,
 }
 
-impl Assistant {
-    pub(crate) fn new(address_book: AddressBook) -> Assistant {
-        Assistant { address_book }
+impl<A: Actor> Assistant<A> {
+    pub(crate) fn new(address_book: AddressBook, actor_id: A::Id) -> Assistant<A> {
+        Assistant {
+            address_book,
+            actor_id,
+        }
     }
 
     /// Sends a message to the Actor with the specified Id.
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+    pub async fn send<A2: Actor + Handle<M>, M: Debug + Send + 'static>(
         &self,
-        actor_id: A::Id,
+        actor_id: A2::Id,
         message: M,
     ) {
-        if let Some(sender) = self.address_book.get::<A>() {
+        if let Some(sender) = self.address_book.get::<A2>() {
             sender
                 .send(ActorManagerProxyCommand::Dispatch(Box::new(
-                    ManagerLetter::<A, M>::new(actor_id, message),
+                    ManagerLetter::<A2, M>::new(actor_id, message),
                 )))
+                .await;
+        }
+    }
+
+    /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.
+    /// Keep in mind that event is an actor is stopped, a new message in the future can wake up the actor.
+    pub async fn stop(&self) {
+        if let Some(sender) = self.address_book.get::<A>() {
+            sender
+                .send(ActorManagerProxyCommand::EndActor(self.actor_id.clone()))
                 .await;
         }
     }
@@ -103,16 +117,17 @@ impl Assistant {
     }
 }
 
-impl Clone for Assistant {
+impl<A: Actor> Clone for Assistant<A> {
     fn clone(&self) -> Self {
         Assistant {
             address_book: self.address_book.clone(),
+            actor_id: self.actor_id.clone(),
         }
     }
 }
 
-impl Debug for Assistant {
+impl<A: Actor> Debug for Assistant<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ActorSecretary ()")
+        write!(f, "ActorSecretary for {}", std::any::type_name::<A>())
     }
 }

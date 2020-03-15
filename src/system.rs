@@ -1,10 +1,8 @@
+use crate::actors_manager::ActorManagerProxyCommand;
 use crate::address_book::{AddressBook, WaitSystemStop};
-use crate::actors_manager::{ActorManagerProxyCommand};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
-use async_std::{
-    task::spawn,
-};
+use async_std::task::spawn;
 use std::fmt::Debug;
 
 /// The system is external inteface to the actor runtime.

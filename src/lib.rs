@@ -50,10 +50,10 @@
 mod actor;
 mod actor_proxy;
 mod actors_manager;
+mod address_book;
 mod assistant;
 mod envelope;
 mod handle;
-mod address_book;
 mod system;
 
 pub use actor::Actor;

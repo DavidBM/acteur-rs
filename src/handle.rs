@@ -60,7 +60,10 @@ use std::fmt::Debug;
 /// Note: You usually don't call stop_system in there, as it will stop the whole actor framework.
 ///
 #[async_trait]
-pub trait Handle<T: Debug>: Actor {
+pub trait Handle<M: Debug>
+where
+    Self: Sized + Actor,
+{
     /// This method is called each time a message is received. You can use the [Assistant](./struct.Assistant.html) to send messages
-    async fn handle(&mut self, message: T, assistant: Assistant);
+    async fn handle(&mut self, message: M, assistant: Assistant<Self>);
 }

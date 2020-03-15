@@ -1,13 +1,13 @@
 use crate::actor_proxy::ActorProxy;
+use crate::address_book::{ActorManagerReport, AddressBook};
 use crate::envelope::ManagerEnvelope;
-use crate::address_book::{AddressBook, ActorManagerReport};
 use crate::Actor;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task::spawn,
 };
-use std::any::TypeId;
 use dashmap::DashMap;
+use std::any::TypeId;
 use std::fmt::Debug;
 
 pub(crate) trait Manager: Send + Sync + Debug {
@@ -17,6 +17,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
+    EndActor(A::Id),
     End,
 }
 
@@ -33,7 +34,10 @@ pub(crate) struct ActorsManager<A: Actor> {
 }
 
 impl<A: Actor> ActorsManager<A> {
-    pub fn new(address_book: AddressBook, manager_report_sender: Sender<ActorManagerReport>) -> ActorsManager<A> {
+    pub fn new(
+        address_book: AddressBook,
+        manager_report_sender: Sender<ActorManagerReport>,
+    ) -> ActorsManager<A> {
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
 
         let (report_sender, report_receiver) = channel::<ActorProxyReport<A>>(1);
@@ -48,7 +52,11 @@ impl<A: Actor> ActorsManager<A> {
             report_sender.clone(),
         );
 
-        actor_proxy_report_loop(report_receiver, actors.clone(), manager_report_sender.clone());
+        actor_proxy_report_loop(
+            report_receiver,
+            actors.clone(),
+            manager_report_sender.clone(),
+        );
 
         ActorsManager {
             actors,
@@ -85,6 +93,12 @@ fn actor_manager_loop<A: Actor>(
             match command {
                 ActorManagerProxyCommand::Dispatch(command) => {
                     process_dispatch_command(command, &actors, &address_book, &report_sender);
+                }
+                ActorManagerProxyCommand::EndActor(id) => {
+                    if let Some(actor) = actors.get_mut(&id) {
+                        actor.end().await;
+                        return;
+                    }
                 }
                 ActorManagerProxyCommand::End => {
                     // We may find cases where we can have several End command in a row. In that case,
@@ -141,15 +155,18 @@ fn process_dispatch_command<A: Actor>(
 fn actor_proxy_report_loop<A: Actor>(
     receiver: Receiver<ActorProxyReport<A>>,
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
-    system_report: Sender<ActorManagerReport>
+    system_report: Sender<ActorManagerReport>,
 ) {
     spawn(async move {
         while let Some(command) = receiver.recv().await {
             match command {
                 ActorProxyReport::ActorStopped(id) => {
                     actors.remove(&id);
+                    //println!("Actor stopping... {} remaining", actors.len());
                     if actors.is_empty() {
-                        system_report.send(ActorManagerReport::ManagerEnded(TypeId::of::<A>())).await;
+                        system_report
+                            .send(ActorManagerReport::ManagerEnded(TypeId::of::<A>()))
+                            .await;
                         break;
                     }
                 }
@@ -167,7 +184,6 @@ async fn recv_until_not_end_command<A: Actor>(
 
     while let Some(command) = receiver.recv().await {
         match command {
-            ActorManagerProxyCommand::Dispatch(_) => return Some(command),
             ActorManagerProxyCommand::End => {
                 if receiver.is_empty() {
                     return None;
@@ -175,6 +191,7 @@ async fn recv_until_not_end_command<A: Actor>(
                     continue;
                 }
             }
+            _ => return Some(command),
         }
     }
 

@@ -4,13 +4,15 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+/// Trait that represents a message directed to an actor.
 #[async_trait]
 pub(crate) trait Envelope: Send + Debug {
     type Actor: Actor;
 
-    async fn dispatch(&mut self, actor: &mut Self::Actor, assistant: Assistant);
+    async fn dispatch(&mut self, actor: &mut Self::Actor, assistant: Assistant<Self::Actor>);
 }
 
+/// This struct implements `Envelope` and stores the message and the Actors type for dynamic dispatch.
 #[derive(Debug)]
 pub(crate) struct Letter<A: Actor, M: Debug> {
     message: Option<M>,
@@ -28,7 +30,7 @@ impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
         }
     }
 
-    pub async fn dispatch(&mut self, actor: &mut A, assistant: Assistant) {
+    pub async fn dispatch(&mut self, actor: &mut A, assistant: Assistant<A>) {
         if let Some(message) = self.message.take() {
             <A as Handle<M>>::handle(actor, message, assistant).await;
         }
@@ -39,11 +41,13 @@ impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
 impl<A: Actor + Handle<M>, M: Send + Debug> Envelope for Letter<A, M> {
     type Actor = A;
 
-    async fn dispatch(&mut self, actor: &mut A, assistant: Assistant) {
+    async fn dispatch(&mut self, actor: &mut A, assistant: Assistant<A>) {
         Letter::<A, M>::dispatch(self, actor, assistant).await
     }
 }
 
+/// Same as Envelope but for Actors Managers. Actors Managers control group of actors of the same type.
+/// This especial envelope assumes that there is an Actor::Id and an ActorProxy
 pub(crate) trait ManagerEnvelope: Send + Debug {
     type Actor: Actor;
 
@@ -52,6 +56,7 @@ pub(crate) trait ManagerEnvelope: Send + Debug {
     fn get_actor_id(&self) -> <<Self as ManagerEnvelope>::Actor as Actor>::Id;
 }
 
+/// The struct that implements `ManagerEnvelope`. Same as Letter, but with the Actor::Id in it in order to route the message
 #[derive(Debug)]
 pub(crate) struct ManagerLetter<A: Actor, M: Debug> {
     message: Option<M>,

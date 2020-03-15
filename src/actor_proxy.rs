@@ -1,6 +1,6 @@
 use crate::actors_manager::ActorProxyReport;
-use crate::envelope::{Envelope, Letter};
 use crate::address_book::AddressBook;
+use crate::envelope::{Envelope, Letter};
 use crate::{Actor, Assistant, Handle};
 use async_std::{
     sync::{channel, Receiver, Sender},
@@ -9,7 +9,7 @@ use async_std::{
 use std::fmt::Debug;
 
 #[derive(Debug)]
-enum ActorProxyCommand<A: Actor> {
+pub(crate) enum ActorProxyCommand<A: Actor> {
     Dispatch(Box<dyn Envelope<Actor = A>>),
     End,
 }
@@ -17,7 +17,7 @@ enum ActorProxyCommand<A: Actor> {
 #[derive(Debug)]
 pub(crate) struct ActorProxy<A: Actor> {
     sender: Sender<ActorProxyCommand<A>>,
-    assistant: Assistant,
+    assistant: Assistant<A>,
 }
 
 impl<A: Actor> ActorProxy<A> {
@@ -29,7 +29,7 @@ impl<A: Actor> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
             channel(5);
 
-        let assistant = Assistant::new(address_book);
+        let assistant = Assistant::new(address_book, id.clone());
 
         actor_loop(
             id,
@@ -68,7 +68,7 @@ fn actor_loop<A: Actor>(
     id: A::Id,
     sender: Sender<ActorProxyCommand<A>>,
     receiver: Receiver<ActorProxyCommand<A>>,
-    assistant: Assistant,
+    assistant: Assistant<A>,
     report_sender: Sender<ActorProxyReport<A>>,
 ) {
     spawn(async move {

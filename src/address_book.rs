@@ -11,6 +11,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+pub(crate) enum ActorManagerReport {
+    ManagerEnded(TypeId),
+}
+
 #[derive(Debug)]
 pub(crate) struct AddressBook {
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
@@ -138,8 +142,4 @@ impl Future for WaitSystemStop {
             Poll::Ready(())
         }
     }
-}
-
-pub(crate) enum ActorManagerReport {
-    ManagerEnded(TypeId),
 }
