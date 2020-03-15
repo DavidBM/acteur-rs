@@ -1,6 +1,6 @@
 [package]
 name = "acteur"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["David Bonet <webbonet@gmail.com>"]
 edition = "2018"
 description = "An actor system that just works. Simple, robust, fast, documented."
@@ -15,8 +15,8 @@ categories = ["asynchronous", "concurrency"]
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-async-trait = "0.1.24"
-async-std = { version = "1.5.0", features = ["unstable"]}
-rand = "0.7.3"
-dashmap = "3.5.0"
-futures = "0.3.4"
+async-trait = "0.1"
+async-std = { version = "1", features = ["unstable"]}
+rand = "0.7"
+dashmap = "3"
+futures = "0.3"
