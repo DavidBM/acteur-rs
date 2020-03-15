@@ -2,7 +2,7 @@ use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
 use async_std::{
-    sync::{Arc, Sender},
+    sync::{channel, Arc, Receiver, Sender},
     task::spawn,
 };
 use dashmap::DashMap;
@@ -88,15 +88,27 @@ pub(crate) struct AddressBook {
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     waker_for_sopped_manager: Arc<AtomicWaker>,
+    manager_report_sender: Sender<ActorManagerReport>,
 }
 
 impl AddressBook {
     pub(crate) fn new() -> AddressBook {
-        AddressBook {
-            senders: Arc::new(DashMap::new()),
-            managers: Arc::new(DashMap::new()),
-            waker_for_sopped_manager: Arc::new(AtomicWaker::new()),
-        }
+        let (sender, receiver) = channel::<ActorManagerReport>(1);
+
+        let sender_list = Arc::new(DashMap::new());
+        let manager_list = Arc::new(DashMap::new());
+        let waker = Arc::new(AtomicWaker::new());
+
+        let address_book = AddressBook {
+            senders: sender_list.clone(),
+            managers: manager_list.clone(),
+            waker_for_sopped_manager: waker.clone(),
+            manager_report_sender: sender,
+        };
+
+        address_book_report_loop(receiver, sender_list, manager_list, waker);
+
+        address_book
     }
 
     pub(crate) fn get<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
@@ -124,7 +136,7 @@ impl AddressBook {
     }
 
     pub(crate) fn create<A: Actor>(&self) {
-        let manager = ActorsManager::<A>::new(self.clone());
+        let manager = ActorsManager::<A>::new(self.clone(), self.manager_report_sender.clone());
         let sender = manager.get_sender();
 
         let type_id = TypeId::of::<A>();
@@ -144,12 +156,37 @@ impl AddressBook {
     }
 }
 
+fn address_book_report_loop(
+    receiver: Receiver<ActorManagerReport>,
+    senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
+    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
+    waker: Arc<AtomicWaker>,
+) {
+    spawn(async move {
+        while let Some(report) = receiver.recv().await {
+            match report {
+                ActorManagerReport::ManagerEnded(id) => {
+                    senders.remove(&id);
+                    managers.remove(&id);
+
+                    match (senders.is_empty(), managers.is_empty()) {
+                        (true, true) => waker.wake(),
+                        (false, true) | (true, false) => unreachable!(),
+                        (false, false) => (),
+                    };
+                }
+            }
+        }
+    });
+}
+
 impl Clone for AddressBook {
     fn clone(&self) -> Self {
         AddressBook {
             senders: self.senders.clone(),
             managers: self.managers.clone(),
             waker_for_sopped_manager: self.waker_for_sopped_manager.clone(),
+            manager_report_sender: self.manager_report_sender.clone(),
         }
     }
 }
@@ -173,4 +210,8 @@ impl Future for WaitSystemStop {
             Poll::Ready(())
         }
     }
+}
+
+pub(crate) enum ActorManagerReport {
+    ManagerEnded(TypeId),
 }

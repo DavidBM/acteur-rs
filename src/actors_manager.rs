@@ -6,8 +6,10 @@ use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task::spawn,
 };
+use std::any::TypeId;
 use dashmap::DashMap;
 use std::fmt::Debug;
+use crate::system::ActorManagerReport;
 
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
@@ -22,7 +24,6 @@ pub(crate) enum ActorManagerProxyCommand<A: Actor> {
 #[derive(Debug)]
 pub(crate) enum ActorProxyReport<A: Actor> {
     ActorStopped(A::Id),
-    AllActorsStopped,
 }
 
 #[derive(Debug)]
@@ -33,7 +34,7 @@ pub(crate) struct ActorsManager<A: Actor> {
 }
 
 impl<A: Actor> ActorsManager<A> {
-    pub fn new(address_book: AddressBook) -> ActorsManager<A> {
+    pub fn new(address_book: AddressBook, manager_report_sender: Sender<ActorManagerReport>) -> ActorsManager<A> {
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
 
         let (report_sender, report_receiver) = channel::<ActorProxyReport<A>>(1);
@@ -48,7 +49,7 @@ impl<A: Actor> ActorsManager<A> {
             report_sender.clone(),
         );
 
-        actor_proxy_report_loop(report_receiver, actors.clone());
+        actor_proxy_report_loop(report_receiver, actors.clone(), manager_report_sender.clone());
 
         ActorsManager {
             actors,
@@ -94,8 +95,6 @@ fn actor_manager_loop<A: Actor>(
                             for actor in actors.iter() {
                                 actor.end().await;
                             }
-
-                            report_sender.send(ActorProxyReport::AllActorsStopped).await;
                             break;
                         }
                         Some(ActorManagerProxyCommand::Dispatch(command)) => {
@@ -143,14 +142,18 @@ fn process_dispatch_command<A: Actor>(
 fn actor_proxy_report_loop<A: Actor>(
     receiver: Receiver<ActorProxyReport<A>>,
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
+    system_report: Sender<ActorManagerReport>
 ) {
     spawn(async move {
         while let Some(command) = receiver.recv().await {
             match command {
                 ActorProxyReport::ActorStopped(id) => {
                     actors.remove(&id);
+                    if actors.is_empty() {
+                        system_report.send(ActorManagerReport::ManagerEnded(TypeId::of::<A>())).await;
+                        break;
+                    }
                 }
-                ActorProxyReport::AllActorsStopped => break,
             }
         }
     });
