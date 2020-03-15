@@ -7,6 +7,7 @@ use async_std::{
     task::spawn,
 };
 use std::fmt::Debug;
+use std::time::SystemTime;
 
 #[derive(Debug)]
 pub(crate) enum ActorProxyCommand<A: Actor> {
@@ -18,6 +19,7 @@ pub(crate) enum ActorProxyCommand<A: Actor> {
 pub(crate) struct ActorProxy<A: Actor> {
     sender: Sender<ActorProxyCommand<A>>,
     assistant: Assistant<A>,
+    last_sent_message_time: SystemTime,
 }
 
 impl<A: Actor> ActorProxy<A> {
@@ -39,14 +41,20 @@ impl<A: Actor> ActorProxy<A> {
             report_sender,
         );
 
-        ActorProxy { sender, assistant }
+        ActorProxy {
+            sender,
+            assistant,
+            last_sent_message_time: SystemTime::now(),
+        }
     }
 
-    pub fn send<M: 'static>(&self, message: M)
+    pub fn send<M: 'static>(&mut self, message: M)
     where
         A: Handle<M>,
         M: Send + Debug,
     {
+        self.last_sent_message_time = SystemTime::now();
+
         let message = Letter::<A, M>::new(message);
 
         let sender = self.sender.clone();
@@ -57,6 +65,10 @@ impl<A: Actor> ActorProxy<A> {
                 .send(ActorProxyCommand::Dispatch(Box::new(message)))
                 .await;
         });
+    }
+
+    pub fn get_last_sent_message_time(&self) -> SystemTime {
+        self.last_sent_message_time
     }
 
     pub async fn end(&self) {

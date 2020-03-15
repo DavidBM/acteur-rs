@@ -51,7 +51,7 @@ impl<A: Actor + Handle<M>, M: Send + Debug> Envelope for Letter<A, M> {
 pub(crate) trait ManagerEnvelope: Send + Debug {
     type Actor: Actor;
 
-    fn dispatch(&mut self, manager: &mut ActorProxy<Self::Actor>);
+    fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>);
 
     fn get_actor_id(&self) -> <<Self as ManagerEnvelope>::Actor as Actor>::Id;
 }
@@ -80,7 +80,7 @@ impl<A: Handle<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
         self.actor_id.clone()
     }
 
-    pub fn dispatch(&mut self, manager: &mut ActorProxy<A>) {
+    pub fn deliver(&mut self, manager: &mut ActorProxy<A>) {
         if let Some(message) = self.message.take() {
             manager.send(message);
         }
@@ -90,8 +90,8 @@ impl<A: Handle<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
 impl<A: Actor + Handle<M>, M: 'static + Send + Debug> ManagerEnvelope for ManagerLetter<A, M> {
     type Actor = A;
 
-    fn dispatch(&mut self, manager: &mut ActorProxy<Self::Actor>) {
-        ManagerLetter::<A, M>::dispatch(self, manager)
+    fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>) {
+        ManagerLetter::<A, M>::deliver(self, manager)
     }
 
     fn get_actor_id(&self) -> A::Id {

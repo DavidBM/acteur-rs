@@ -6,6 +6,7 @@ use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task::spawn,
 };
+use std::time::{Duration, SystemTime};
 use dashmap::DashMap;
 use std::any::TypeId;
 use std::fmt::Debug;
@@ -18,6 +19,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
     EndActor(A::Id),
+    EndOldActors(Duration),
     End,
 }
 
@@ -100,6 +102,24 @@ fn actor_manager_loop<A: Actor>(
                         return;
                     }
                 }
+                ActorManagerProxyCommand::EndOldActors(clean_duration) => {
+                    let now = SystemTime::now();
+                    //let mut ended_actors = 0;
+                    for actor in actors.iter() {
+                        let last_message = actor.get_last_sent_message_time();
+
+                        match now.duration_since(last_message) {
+                            Ok(dur) if dur >= clean_duration => {
+                                //ended_actors += 1;
+                                actor.end().await;
+                            },
+                            Err(_) => unreachable!(),
+                            _ => (),
+                        }
+                    }
+
+
+                }
                 ActorManagerProxyCommand::End => {
                     // We may find cases where we can have several End command in a row. In that case,
                     // we want to consume all the end command together until we find nothing or a not-end command
@@ -137,7 +157,7 @@ fn process_dispatch_command<A: Actor>(
     let actor_id = command.get_actor_id();
 
     if let Some(mut actor) = actors.get_mut(&actor_id) {
-        command.dispatch(&mut actor);
+        command.deliver(&mut actor);
         return;
     }
 
@@ -147,7 +167,7 @@ fn process_dispatch_command<A: Actor>(
         report_sender.clone(),
     );
 
-    command.dispatch(&mut actor);
+    command.deliver(&mut actor);
 
     actors.insert(actor_id, actor);
 }
@@ -169,7 +189,7 @@ fn actor_proxy_report_loop<A: Actor>(
                             .await;
                         break;
                     }
-                }
+                },
             }
         }
     });

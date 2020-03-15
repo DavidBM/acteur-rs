@@ -47,7 +47,7 @@ Regarding the implementation:
 - [x] Stop waits for all actors to consume all messages
 - [ ] Subscribe to message
 - [ ] Fan-out messages
-- [ ] Actor self stop
+- [x] Actor self stop
 - [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 
 ## Examples
