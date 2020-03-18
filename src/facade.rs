@@ -1,29 +1,27 @@
-use crate::actors_manager::ActorManagerProxyCommand;
-use crate::address_book::{AddressBook, WaitSystemStop};
-use crate::envelope::ManagerLetter;
+use crate::address_book::AddressBook;
 use crate::{Actor, Handle};
-use async_std::task::block_on;
+use async_std::task;
 use std::fmt::Debug;
 
-/// The system is external inteface to the actor runtime.
-/// It allow to send messages, to stop it, configure it, etc.
-/// Once you contructed with the method "new" you can start sending messages.
-/// The system will automatically start any required actor automatically and unload them when required.
-pub struct System {
+/// Acteur is the main inteface to the actor runtime.
+/// It allows sending messages, stopping the runtime, set configurations, etc.
+/// Once contructed with the method "new" you can start sending messages.
+/// The system will automatically start any required actor and unload them when not used.
+pub struct Acteur {
     address_book: AddressBook,
 }
 
-impl Default for System {
+impl Default for Acteur {
     fn default() -> Self {
-        System::new()
+        Acteur::new()
     }
 }
 
-impl System {
+impl Acteur {
     /// Initializes the system. After this, you can send messages using the send method.
-    pub fn new() -> System {
+    pub fn new() -> Acteur {
         let address_book = AddressBook::new();
-        System { address_book }
+        Acteur { address_book }
     }
 
     /// Sends a message to an actor with an ID.
@@ -34,13 +32,7 @@ impl System {
         actor_id: A::Id,
         message: M,
     ) {
-        if let Some(sender) = self.address_book.get::<A>() {
-            sender
-                .send(ActorManagerProxyCommand::Dispatch(Box::new(
-                    ManagerLetter::new(actor_id, message),
-                )))
-                .await;
-        }
+        self.address_book.send::<A, M>(actor_id, message).await;
     }
 
     /// Same as `send` method, but sync version.
@@ -49,7 +41,7 @@ impl System {
         actor_id: A::Id,
         message: M,
     ) {
-        block_on(async move { self.send::<A, M>(actor_id, message).await })
+        task::block_on(async move { self.send::<A, M>(actor_id, message).await })
     }
 
     /// Send an stop message to all actors in the system.
@@ -62,21 +54,21 @@ impl System {
     /// If you call "system.stop()" this method will wait untill all actor
     /// have consumed all messages before returning.
     pub fn wait_until_stopped(&self) {
-        block_on(async {
-            WaitSystemStop::new(self.address_book.clone()).await;
+        task::block_on(async {
+            self.address_book.wait_until_stopped().await;
         });
     }
 }
 
-impl Debug for System {
+impl Debug for Acteur {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ActeurSystem ()")
+        write!(f, "Acteur ()")
     }
 }
 
-impl Clone for System {
+impl Clone for Acteur {
     fn clone(&self) -> Self {
-        System {
+        Acteur {
             address_book: self.address_book.clone(),
         }
     }

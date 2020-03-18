@@ -1,12 +1,14 @@
-use crate::actor::Actor;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
+use crate::envelope::ManagerLetter;
+use crate::{Actor, Handle};
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
-    task::spawn,
+    task,
 };
 use dashmap::DashMap;
 use futures::task::AtomicWaker;
 use std::any::{Any, TypeId};
+use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -15,12 +17,14 @@ pub(crate) enum ActorManagerReport {
     ManagerEnded(TypeId),
 }
 
+// TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
 pub(crate) struct AddressBook {
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
-    waker_for_sopped_manager: Arc<AtomicWaker>,
     manager_report_sender: Sender<ActorManagerReport>,
+    // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
+    waker: Arc<AtomicWaker>,
 }
 
 impl AddressBook {
@@ -34,16 +38,21 @@ impl AddressBook {
         let address_book = AddressBook {
             senders: sender_list.clone(),
             managers: manager_list.clone(),
-            waker_for_sopped_manager: waker.clone(),
             manager_report_sender: sender,
+            waker: waker.clone(),
         };
 
-        address_book_report_loop(receiver, sender_list, manager_list, waker);
+        task::spawn(address_book_report_loop(
+            receiver,
+            sender_list,
+            manager_list,
+            waker,
+        ));
 
         address_book
     }
 
-    pub(crate) fn get<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
+    pub(crate) fn get_sender<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
     where
         A: Actor,
     {
@@ -67,7 +76,27 @@ impl AddressBook {
         }
     }
 
+    pub async fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        message: M,
+    ) {
+        if let Some(sender) = self.get_sender::<A>() {
+            sender
+                .send(ActorManagerProxyCommand::Dispatch(Box::new(
+                    ManagerLetter::new(actor_id, message),
+                )))
+                .await;
+        }
+    }
+
+    pub(crate) async fn wait_until_stopped(&self) {
+        WaitSystemStop::new(self.clone()).await;
+    }
+
     pub(crate) fn create<A: Actor>(&self) {
+        // TOOD: Check if sending self and the Sender makes sense as the Sender is already in self.
+        // Removing the sender here may allow to remove the address_book_report_loop.
         let manager = ActorsManager::<A>::new(self.clone(), self.manager_report_sender.clone());
         let sender = manager.get_sender();
 
@@ -88,28 +117,26 @@ impl AddressBook {
     }
 }
 
-fn address_book_report_loop(
+async fn address_book_report_loop(
     receiver: Receiver<ActorManagerReport>,
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     waker: Arc<AtomicWaker>,
 ) {
-    spawn(async move {
-        while let Some(report) = receiver.recv().await {
-            match report {
-                ActorManagerReport::ManagerEnded(id) => {
-                    senders.remove(&id);
-                    managers.remove(&id);
+    while let Some(report) = receiver.recv().await {
+        match report {
+            ActorManagerReport::ManagerEnded(id) => {
+                senders.remove(&id);
+                managers.remove(&id);
 
-                    match (senders.is_empty(), managers.is_empty()) {
-                        (true, true) => waker.wake(),
-                        (false, true) | (true, false) => unreachable!(),
-                        (false, false) => (),
-                    };
-                }
+                match (senders.is_empty(), managers.is_empty()) {
+                    (true, true) => waker.wake(),
+                    (false, true) | (true, false) => unreachable!(),
+                    (false, false) => (),
+                };
             }
         }
-    });
+    }
 }
 
 impl Clone for AddressBook {
@@ -117,8 +144,8 @@ impl Clone for AddressBook {
         AddressBook {
             senders: self.senders.clone(),
             managers: self.managers.clone(),
-            waker_for_sopped_manager: self.waker_for_sopped_manager.clone(),
             manager_report_sender: self.manager_report_sender.clone(),
+            waker: self.waker.clone(),
         }
     }
 }
@@ -126,8 +153,8 @@ impl Clone for AddressBook {
 pub(crate) struct WaitSystemStop(AddressBook);
 
 impl WaitSystemStop {
-    pub fn new(system: AddressBook) -> WaitSystemStop {
-        WaitSystemStop(system)
+    pub fn new(waker: AddressBook) -> WaitSystemStop {
+        WaitSystemStop(waker)
     }
 }
 
@@ -136,7 +163,7 @@ impl Future for WaitSystemStop {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         if self.0.count_actor_managers() > 0 {
-            self.0.waker_for_sopped_manager.register(cx.waker());
+            self.0.waker.register(cx.waker());
             Poll::Pending
         } else {
             Poll::Ready(())

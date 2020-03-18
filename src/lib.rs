@@ -54,9 +54,9 @@ mod address_book;
 mod assistant;
 mod envelope;
 mod handle;
-mod system;
+mod facade;
 
 pub use actor::Actor;
 pub use assistant::Assistant;
 pub use handle::Handle;
-pub use system::System;
+pub use facade::Acteur;

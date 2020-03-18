@@ -91,7 +91,7 @@ impl<A: Actor> Assistant<A> {
         actor_id: A2::Id,
         message: M,
     ) {
-        if let Some(sender) = self.address_book.get::<A2>() {
+        if let Some(sender) = self.address_book.get_sender::<A2>() {
             sender
                 .send(ActorManagerProxyCommand::Dispatch(Box::new(
                     ManagerLetter::<A2, M>::new(actor_id, message),
@@ -103,7 +103,7 @@ impl<A: Actor> Assistant<A> {
     /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.
     /// Keep in mind that event is an actor is stopped, a new message in the future can wake up the actor.
     pub async fn stop(&self) {
-        if let Some(sender) = self.address_book.get::<A>() {
+        if let Some(sender) = self.address_book.get_sender::<A>() {
             sender
                 .send(ActorManagerProxyCommand::EndActor(self.actor_id.clone()))
                 .await;
