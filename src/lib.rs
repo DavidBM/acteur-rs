@@ -7,7 +7,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use acteur::{Actor, Handle, Assistant, System};
+//! use acteur::{Actor, Handle, Assistant, Acteur};
 //! use async_trait::async_trait;
 //!
 //! #[derive(Debug)]
@@ -37,7 +37,7 @@
 //! }
 //!
 //! # fn main() {
-//! let sys = System::new();
+//! let sys = Acteur::new();
 //!
 //! sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 //!
@@ -53,10 +53,10 @@ mod actors_manager;
 mod address_book;
 mod assistant;
 mod envelope;
-mod handle;
 mod facade;
+mod handle;
 
 pub use actor::Actor;
 pub use assistant::Assistant;
-pub use handle::Handle;
 pub use facade::Acteur;
+pub use handle::Handle;

@@ -1,4 +1,4 @@
-use acteur::{Actor, Assistant, Handle, System};
+use acteur::{Acteur, Actor, Assistant, Handle};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -13,7 +13,7 @@ pub fn start() {
     let start = SystemTime::now();
     println!("Time to start: {:?}", start);
 
-    let sys = System::new();
+    let sys = Acteur::new();
 
     for i in 0..1u32 {
         let message = TestMessage { field: i };

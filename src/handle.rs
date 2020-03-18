@@ -31,7 +31,7 @@ use std::fmt::Debug;
 /// #         println!("Employee {:?} deactivated!", self.id);
 /// #     }
 /// # }
-/// use acteur::{Assistant, Handle, System};
+/// use acteur::{Assistant, Handle, Acteur};
 ///
 /// #[derive(Debug)]
 /// struct SalaryChanged(u32);
@@ -44,7 +44,7 @@ use std::fmt::Debug;
 /// }
 ///
 /// fn main() {
-///     let sys = System::new();
+///     let sys = Acteur::new();
 ///
 ///     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 ///

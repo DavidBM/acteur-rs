@@ -55,7 +55,7 @@ impl<A: Actor> ActorsManager<A> {
             sender.clone(),
             actors.clone(),
             address_book,
-            report_sender.clone(),
+            report_sender,
             is_ending.clone(),
         ));
 
@@ -63,14 +63,11 @@ impl<A: Actor> ActorsManager<A> {
         task::spawn(actor_proxy_report_loop(
             report_receiver,
             actors.clone(),
-            manager_report_sender.clone(),
-            is_ending.clone(),
+            manager_report_sender,
+            is_ending,
         ));
 
-        ActorsManager {
-            actors,
-            sender,
-        }
+        ActorsManager { actors, sender }
     }
 
     pub(crate) fn end(&self) {
@@ -125,7 +122,8 @@ async fn actor_manager_loop<A: Actor>(
                     &address_book,
                     &report_sender,
                     &is_ending,
-                ).await;
+                )
+                .await;
 
                 if let LoopStatus::Stop = loop_continuity {
                     break;
@@ -179,7 +177,7 @@ async fn process_end_old_actors_command<'a, A: Actor>(
         // In the case we have many many actors, we don't want to block for long
         // Maybe it is premature optimization, but I feel that having 100K+ actors
         // and iterating in all of them can take long enough to have a 1 sec pause
-        if index % 1000 == 0{
+        if index % 1000 == 0 {
             task::yield_now().await;
         }
     }

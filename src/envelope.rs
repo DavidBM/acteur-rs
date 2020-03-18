@@ -4,16 +4,16 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-/// This structures encapsulate the message and capture the Type through a PhantonType, 
+/// This structures encapsulate the message and capture the Type through a PhantonType,
 /// making them safe to send via channels that may allow different types Letter<A> != Letter<B>
-/// at the same time that you are able to use the type later in the dispatch/deliver method. 
-/// The way this works is that the Letter/Envelope will receive the Actor and it will be the 
+/// at the same time that you are able to use the type later in the dispatch/deliver method.
+/// The way this works is that the Letter/Envelope will receive the Actor and it will be the
 /// one calling the method of the Actor A or B.
 
-/// There are two variants of these structures. One is the Envelope/Letter pair, with executes the 
-/// handle method from the Actor trait directly. The other is the ManagerEnvelope/ManagerLetter that 
-/// sends the message to the ActorProxy inbox channel. The only difference between them both beyond 
-/// the difference in the method calling is that the former contains the Actor::Id that should 
+/// There are two variants of these structures. One is the Envelope/Letter pair, with executes the
+/// handle method from the Actor trait directly. The other is the ManagerEnvelope/ManagerLetter that
+/// sends the message to the ActorProxy inbox channel. The only difference between them both beyond
+/// the difference in the method calling is that the former contains the Actor::Id that should
 /// receive the message.
 
 /// Trait that represents a message directed to an actor instance.
@@ -24,9 +24,9 @@ pub(crate) trait Envelope: Send + Debug {
     async fn dispatch(&mut self, actor: &mut Self::Actor, assistant: &Assistant<Self::Actor>);
 }
 
-/// This struct implements `Envelope` and stores the message and the Actors type. This is 
+/// This struct implements `Envelope` and stores the message and the Actors type. This is
 /// required as we are sending the message through a channel that contain Boxed Envelope Traits
-/// which cannot contain the M type as they are generic for all messages. 
+/// which cannot contain the M type as they are generic for all messages.
 #[derive(Debug)]
 pub(crate) struct Letter<A: Actor, M: Debug> {
     message: Option<M>,

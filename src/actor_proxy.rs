@@ -32,13 +32,7 @@ impl<A: Actor> ActorProxy<A> {
 
         let assistant = Assistant::new(address_book, id.clone());
 
-        actor_loop(
-            id,
-            sender.clone(),
-            receiver,
-            assistant.clone(),
-            report_sender,
-        );
+        actor_loop(id, sender.clone(), receiver, assistant, report_sender);
 
         ActorProxy {
             sender,

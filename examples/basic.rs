@@ -1,4 +1,4 @@
-use acteur::{Actor, Assistant, Handle, System};
+use acteur::{Acteur, Actor, Assistant, Handle};
 use async_trait::async_trait;
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl Handle<SalaryChanged> for Employee {
 }
 
 fn main() {
-    let sys = System::new();
+    let sys = Acteur::new();
 
     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 

@@ -8,7 +8,7 @@ use std::fmt::Debug;
 /// The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no_run
-/// # use acteur::{Actor, Handle, Assistant, System};
+/// # use acteur::{Actor, Handle, Assistant, Acteur};
 /// # use async_trait::async_trait;
 /// #
 /// # #[derive(Debug)]
@@ -62,7 +62,7 @@ use std::fmt::Debug;
 /// }
 ///
 /// # fn main() {
-/// #     let sys = System::new();
+/// #     let sys = Acteur::new();
 /// #
 /// #     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 /// #
