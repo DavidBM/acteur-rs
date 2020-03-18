@@ -2,6 +2,13 @@ use crate::address_book::AddressBook;
 use crate::{Actor, Handle};
 use async_std::task;
 use std::fmt::Debug;
+use lazy_static::lazy_static;
+
+// We do this in order to keep all the actors in the same system. If not, two calls 
+// to "new" can create duplicated actors. 
+lazy_static! {
+     static ref ADDRESS_BOOK: AddressBook = AddressBook::new();
+}
 
 /// Acteur is the main inteface to the actor runtime.
 /// It allows sending messages, stopping the runtime, set configurations, etc.
@@ -20,8 +27,7 @@ impl Default for Acteur {
 impl Acteur {
     /// Initializes the system. After this, you can send messages using the send method.
     pub fn new() -> Acteur {
-        let address_book = AddressBook::new();
-        Acteur { address_book }
+        Acteur { address_book: ADDRESS_BOOK.clone() }
     }
 
     /// Sends a message to an actor with an ID.

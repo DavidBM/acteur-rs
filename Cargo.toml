@@ -20,3 +20,4 @@ async-std = { version = "1", features = ["unstable"]}
 rand = "0.7"
 dashmap = "3"
 futures = "0.3"
+lazy_static = "1.4.0"
