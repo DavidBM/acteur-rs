@@ -4,11 +4,12 @@ use crate::envelope::ManagerEnvelope;
 use crate::Actor;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
-    task::spawn,
+    task,
 };
 use dashmap::DashMap;
 use std::any::TypeId;
 use std::fmt::Debug;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 pub(crate) trait Manager: Send + Sync + Debug {
@@ -32,7 +33,6 @@ pub(crate) enum ActorProxyReport<A: Actor> {
 pub(crate) struct ActorsManager<A: Actor> {
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
     sender: Sender<ActorManagerProxyCommand<A>>,
-    report_sender: Sender<ActorProxyReport<A>>,
 }
 
 impl<A: Actor> ActorsManager<A> {
@@ -40,36 +40,42 @@ impl<A: Actor> ActorsManager<A> {
         address_book: AddressBook,
         manager_report_sender: Sender<ActorManagerReport>,
     ) -> ActorsManager<A> {
+        // Channel in order to receive commands (like sending messages to actors, stopping, etc)
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
 
+        // Channel for getting reports back from ActorProxies
         let (report_sender, report_receiver) = channel::<ActorProxyReport<A>>(1);
 
         let actors = Arc::new(DashMap::new());
+        let is_ending = Arc::new(AtomicBool::new(false));
 
-        actor_manager_loop(
+        // Loop for processing commands
+        task::spawn(actor_manager_loop(
             receiver,
             sender.clone(),
             actors.clone(),
             address_book,
             report_sender.clone(),
-        );
+            is_ending.clone(),
+        ));
 
-        actor_proxy_report_loop(
+        // Loop for processing ActorProxies reports
+        task::spawn(actor_proxy_report_loop(
             report_receiver,
             actors.clone(),
             manager_report_sender.clone(),
-        );
+            is_ending.clone(),
+        ));
 
         ActorsManager {
             actors,
             sender,
-            report_sender,
         }
     }
 
     pub(crate) fn end(&self) {
         let sender = self.sender.clone();
-        spawn(async move {
+        task::spawn(async move {
             sender.send(ActorManagerProxyCommand::End).await;
         });
     }
@@ -83,68 +89,130 @@ impl<A: Actor> ActorsManager<A> {
     }*/
 }
 
-fn actor_manager_loop<A: Actor>(
+#[derive(Debug)]
+enum LoopStatus {
+    Continue,
+    Stop,
+}
+
+async fn actor_manager_loop<A: Actor>(
     receiver: Receiver<ActorManagerProxyCommand<A>>,
     sender: Sender<ActorManagerProxyCommand<A>>,
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
     address_book: AddressBook,
     report_sender: Sender<ActorProxyReport<A>>,
+    is_ending: Arc<AtomicBool>,
 ) {
-    spawn(async move {
-        while let Some(command) = receiver.recv().await {
-            match command {
-                ActorManagerProxyCommand::Dispatch(command) => {
-                    process_dispatch_command(command, &actors, &address_book, &report_sender).await;
+    while let Some(command) = receiver.recv().await {
+        match command {
+            ActorManagerProxyCommand::Dispatch(command) => {
+                process_dispatch_command(command, &actors, &address_book, &report_sender).await;
+            }
+            ActorManagerProxyCommand::EndActor(id) => {
+                if let Some(actor) = actors.get_mut(&id) {
+                    actor.end().await;
+                    return;
                 }
-                ActorManagerProxyCommand::EndActor(id) => {
-                    if let Some(actor) = actors.get_mut(&id) {
-                        actor.end().await;
-                        return;
-                    }
-                }
-                ActorManagerProxyCommand::EndOldActors(clean_duration) => {
-                    let now = SystemTime::now();
-                    //let mut ended_actors = 0;
-                    for actor in actors.iter() {
-                        let last_message = actor.get_last_sent_message_time();
+            }
+            ActorManagerProxyCommand::EndOldActors(clean_duration) => {
+                process_end_old_actors_command(&actors, clean_duration).await;
+            }
+            ActorManagerProxyCommand::End => {
+                let loop_continuity = process_end_command(
+                    &receiver,
+                    &actors,
+                    &sender,
+                    &address_book,
+                    &report_sender,
+                    &is_ending,
+                ).await;
 
-                        match now.duration_since(last_message) {
-                            Ok(dur) if dur >= clean_duration => {
-                                //ended_actors += 1;
-                                actor.end().await;
-                            }
-                            Err(_) => unreachable!(),
-                            _ => (),
-                        }
-                    }
-                }
-                ActorManagerProxyCommand::End => {
-                    // We may find cases where we can have several End command in a row. In that case,
-                    // we want to consume all the end command together until we find nothing or a not-end command
-                    match recv_until_not_end_command(receiver.clone()).await {
-                        None => {
-                            for actor in actors.iter() {
-                                actor.end().await;
-                            }
-                            break;
-                        }
-                        Some(ActorManagerProxyCommand::Dispatch(command)) => {
-                            // If there are any message left, we postpone the shutdown.
-                            sender.send(ActorManagerProxyCommand::End).await;
-                            process_dispatch_command(
-                                command,
-                                &actors,
-                                &address_book,
-                                &report_sender,
-                            )
-                            .await;
-                        }
-                        _ => unreachable!(),
-                    }
+                if let LoopStatus::Stop = loop_continuity {
+                    break;
                 }
             }
         }
-    });
+    }
+}
+
+async fn actor_proxy_report_loop<A: Actor>(
+    receiver: Receiver<ActorProxyReport<A>>,
+    actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
+    system_report: Sender<ActorManagerReport>,
+    is_ending: Arc<AtomicBool>,
+) {
+    while let Some(command) = receiver.recv().await {
+        match command {
+            ActorProxyReport::ActorStopped(id) => {
+                actors.remove(&id);
+
+                // We only send the "end" report in the case where an End command was previously sent
+                if actors.is_empty() && is_ending.load(Ordering::Relaxed) {
+                    system_report
+                        .send(ActorManagerReport::ManagerEnded(TypeId::of::<A>()))
+                        .await;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+async fn process_end_old_actors_command<'a, A: Actor>(
+    actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
+    clean_duration: Duration,
+) {
+    let now = SystemTime::now();
+    //let mut ended_actors = 0;
+    for (index, actor) in actors.iter().enumerate() {
+        let last_message = actor.get_last_sent_message_time();
+
+        match now.duration_since(last_message) {
+            Ok(dur) if dur >= clean_duration => {
+                //ended_actors += 1;
+                actor.end().await;
+            }
+            Err(_) => unreachable!(),
+            _ => (),
+        }
+
+        // In the case we have many many actors, we don't want to block for long
+        // Maybe it is premature optimization, but I feel that having 100K+ actors
+        // and iterating in all of them can take long enough to have a 1 sec pause
+        if index % 1000 == 0{
+            task::yield_now().await;
+        }
+    }
+}
+
+async fn process_end_command<'a, A: Actor>(
+    receiver: &'a Receiver<ActorManagerProxyCommand<A>>,
+    actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
+    sender: &'a Sender<ActorManagerProxyCommand<A>>,
+    address_book: &'a AddressBook,
+    report_sender: &'a Sender<ActorProxyReport<A>>,
+    is_ending: &'a Arc<AtomicBool>,
+) -> LoopStatus {
+    is_ending.store(true, Ordering::Relaxed);
+
+    // We may find cases where we can have several End command in a row. In that case,
+    // we want to consume all the end command together until we totally consume the messages
+    // or we find a not-end command
+    match recv_until_not_end_command(receiver.clone()).await {
+        None => {
+            for actor in actors.iter() {
+                actor.end().await;
+            }
+            LoopStatus::Stop
+        }
+        Some(ActorManagerProxyCommand::Dispatch(command)) => {
+            // If there are any message left, we postpone the shutdown.
+            sender.send(ActorManagerProxyCommand::End).await;
+            process_dispatch_command(command, &actors, &address_book, &report_sender).await;
+            LoopStatus::Continue
+        }
+        _ => unreachable!(),
+    }
 }
 
 async fn process_dispatch_command<'a, A: Actor>(
@@ -165,31 +233,10 @@ async fn process_dispatch_command<'a, A: Actor>(
         actor_id.clone(),
         report_sender.clone(),
     );
-    command.deliver(&mut actor).await;
-    actors.insert(actor_id, actor);
-}
 
-fn actor_proxy_report_loop<A: Actor>(
-    receiver: Receiver<ActorProxyReport<A>>,
-    actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
-    system_report: Sender<ActorManagerReport>,
-) {
-    spawn(async move {
-        while let Some(command) = receiver.recv().await {
-            match command {
-                ActorProxyReport::ActorStopped(id) => {
-                    actors.remove(&id);
-                    // TODO: Handle the case when not actors remaining but we still we didn't ended the actor manager
-                    if actors.is_empty() {
-                        system_report
-                            .send(ActorManagerReport::ManagerEnded(TypeId::of::<A>()))
-                            .await;
-                        break;
-                    }
-                }
-            }
-        }
-    });
+    command.deliver(&mut actor).await;
+
+    actors.insert(actor_id, actor);
 }
 
 async fn recv_until_not_end_command<A: Actor>(
@@ -220,7 +267,6 @@ impl<A: Actor> Clone for ActorsManager<A> {
         ActorsManager {
             actors: self.actors.clone(),
             sender: self.sender.clone(),
-            report_sender: self.report_sender.clone(),
         }
     }
 }

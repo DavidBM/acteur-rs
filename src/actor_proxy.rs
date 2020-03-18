@@ -18,7 +18,6 @@ pub(crate) enum ActorProxyCommand<A: Actor> {
 #[derive(Debug)]
 pub(crate) struct ActorProxy<A: Actor> {
     sender: Sender<ActorProxyCommand<A>>,
-    assistant: Assistant<A>,
     last_sent_message_time: SystemTime,
 }
 
@@ -43,7 +42,6 @@ impl<A: Actor> ActorProxy<A> {
 
         ActorProxy {
             sender,
-            assistant,
             last_sent_message_time: SystemTime::now(),
         }
     }
@@ -86,7 +84,7 @@ fn actor_loop<A: Actor>(
             while let Some(command) = receiver.recv().await {
                 match command {
                     ActorProxyCommand::Dispatch(mut envelope) => {
-                        envelope.dispatch(&mut actor, assistant.clone()).await
+                        envelope.dispatch(&mut actor, &assistant).await
                     }
                     ActorProxyCommand::End => {
                         // We may find cases where we can have several End command in a row. In that case,
@@ -100,7 +98,7 @@ fn actor_loop<A: Actor>(
                             Some(ActorProxyCommand::Dispatch(mut envelope)) => {
                                 // If there are any message left, we postpone the shutdown.
                                 sender.send(ActorProxyCommand::End).await;
-                                envelope.dispatch(&mut actor, assistant.clone()).await
+                                envelope.dispatch(&mut actor, &assistant).await
                             }
                             _ => unreachable!(),
                         }

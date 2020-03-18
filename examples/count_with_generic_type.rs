@@ -55,7 +55,7 @@ impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug> Actor for TestActor<T
 /// The only missing piece for shortening this would be: https://github.com/rust-lang/rust/issues/13231
 #[async_trait]
 impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug> Handle<TestMessage> for TestActor<T> {
-    async fn handle(&mut self, message: TestMessage, assistant: Assistant<TestActor<T>>) {
+    async fn handle(&mut self, message: TestMessage, assistant: &Assistant<TestActor<T>>) {
         /*println!(
             "I'm actor {:?} and I'm sending a message for actor {:?}",
             self.id, message.field + 1

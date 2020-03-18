@@ -22,7 +22,7 @@ struct SalaryChanged(u32);
 
 #[async_trait]
 impl Handle<SalaryChanged> for Employee {
-    async fn handle(&mut self, message: SalaryChanged, _: Assistant<Employee>) {
+    async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
         self.salary = message.0;
     }
 }
@@ -30,7 +30,7 @@ impl Handle<SalaryChanged> for Employee {
 fn main() {
     let sys = System::new();
 
-    sys.send::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+    sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 
     sys.wait_until_stopped();
 }

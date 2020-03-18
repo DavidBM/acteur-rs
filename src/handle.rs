@@ -38,7 +38,7 @@ use std::fmt::Debug;
 ///
 /// #[async_trait]
 /// impl Handle<SalaryChanged> for Employee {
-///     async fn handle(&mut self, message: SalaryChanged, _: Assistant<Employee>) {
+///     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
 ///         self.salary = message.0;
 ///     }
 /// }
@@ -46,7 +46,7 @@ use std::fmt::Debug;
 /// fn main() {
 ///     let sys = System::new();
 ///
-///     sys.send::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+///     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 ///
 ///     sys.wait_until_stopped();
 /// }
@@ -65,5 +65,5 @@ where
     Self: Sized + Actor,
 {
     /// This method is called each time a message is received. You can use the [Assistant](./struct.Assistant.html) to send messages
-    async fn handle(&mut self, message: M, assistant: Assistant<Self>);
+    async fn handle(&mut self, message: M, assistant: &Assistant<Self>);
 }
