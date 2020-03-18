@@ -2,7 +2,7 @@ use crate::actors_manager::ActorManagerProxyCommand;
 use crate::address_book::{AddressBook, WaitSystemStop};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
-use async_std::task::spawn;
+use async_std::task::block_on;
 use std::fmt::Debug;
 
 /// The system is external inteface to the actor runtime.
@@ -29,20 +29,27 @@ impl System {
     /// Sends a message to an actor with an ID.
     /// If the actor is not loaded in Ram, this method will load them first
     /// by calling their "activate" method.
-    pub fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+    pub async fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
     ) {
         if let Some(sender) = self.address_book.get::<A>() {
-            spawn(async move {
-                sender
-                    .send(ActorManagerProxyCommand::Dispatch(Box::new(
-                        ManagerLetter::new(actor_id, message),
-                    )))
-                    .await;
-            });
+            sender
+                .send(ActorManagerProxyCommand::Dispatch(Box::new(
+                    ManagerLetter::new(actor_id, message),
+                )))
+                .await;
         }
+    }
+
+    /// Same as `send` method, but sync version.
+    pub fn send_sync<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        message: M,
+    ) {
+        block_on(async move { self.send::<A, M>(actor_id, message).await })
     }
 
     /// Send an stop message to all actors in the system.
@@ -55,7 +62,7 @@ impl System {
     /// If you call "system.stop()" this method will wait untill all actor
     /// have consumed all messages before returning.
     pub fn wait_until_stopped(&self) {
-        async_std::task::block_on(async {
+        block_on(async {
             WaitSystemStop::new(self.address_book.clone()).await;
         });
     }

@@ -6,10 +6,10 @@ use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task::spawn,
 };
-use std::time::{Duration, SystemTime};
 use dashmap::DashMap;
 use std::any::TypeId;
 use std::fmt::Debug;
+use std::time::{Duration, SystemTime};
 
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
@@ -94,7 +94,7 @@ fn actor_manager_loop<A: Actor>(
         while let Some(command) = receiver.recv().await {
             match command {
                 ActorManagerProxyCommand::Dispatch(command) => {
-                    process_dispatch_command(command, &actors, &address_book, &report_sender);
+                    process_dispatch_command(command, &actors, &address_book, &report_sender).await;
                 }
                 ActorManagerProxyCommand::EndActor(id) => {
                     if let Some(actor) = actors.get_mut(&id) {
@@ -112,13 +112,11 @@ fn actor_manager_loop<A: Actor>(
                             Ok(dur) if dur >= clean_duration => {
                                 //ended_actors += 1;
                                 actor.end().await;
-                            },
+                            }
                             Err(_) => unreachable!(),
                             _ => (),
                         }
                     }
-
-
                 }
                 ActorManagerProxyCommand::End => {
                     // We may find cases where we can have several End command in a row. In that case,
@@ -138,7 +136,8 @@ fn actor_manager_loop<A: Actor>(
                                 &actors,
                                 &address_book,
                                 &report_sender,
-                            );
+                            )
+                            .await;
                         }
                         _ => unreachable!(),
                     }
@@ -148,16 +147,16 @@ fn actor_manager_loop<A: Actor>(
     });
 }
 
-fn process_dispatch_command<A: Actor>(
+async fn process_dispatch_command<'a, A: Actor>(
     mut command: Box<dyn ManagerEnvelope<Actor = A>>,
-    actors: &Arc<DashMap<A::Id, ActorProxy<A>>>,
-    address_book: &AddressBook,
-    report_sender: &Sender<ActorProxyReport<A>>,
+    actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
+    address_book: &'a AddressBook,
+    report_sender: &'a Sender<ActorProxyReport<A>>,
 ) {
     let actor_id = command.get_actor_id();
 
     if let Some(mut actor) = actors.get_mut(&actor_id) {
-        command.deliver(&mut actor);
+        command.deliver(&mut actor).await;
         return;
     }
 
@@ -166,9 +165,7 @@ fn process_dispatch_command<A: Actor>(
         actor_id.clone(),
         report_sender.clone(),
     );
-
-    command.deliver(&mut actor);
-
+    command.deliver(&mut actor).await;
     actors.insert(actor_id, actor);
 }
 
@@ -182,14 +179,14 @@ fn actor_proxy_report_loop<A: Actor>(
             match command {
                 ActorProxyReport::ActorStopped(id) => {
                     actors.remove(&id);
-                    //println!("Actor stopping... {} remaining", actors.len());
+                    // TODO: Handle the case when not actors remaining but we still we didn't ended the actor manager
                     if actors.is_empty() {
                         system_report
                             .send(ActorManagerReport::ManagerEnded(TypeId::of::<A>()))
                             .await;
                         break;
                     }
-                },
+                }
             }
         }
     });

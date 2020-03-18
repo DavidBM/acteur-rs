@@ -48,10 +48,11 @@ impl<A: Actor + Handle<M>, M: Send + Debug> Envelope for Letter<A, M> {
 
 /// Same as Envelope but for Actors Managers. Actors Managers control group of actors of the same type.
 /// This especial envelope assumes that there is an Actor::Id and an ActorProxy
+#[async_trait]
 pub(crate) trait ManagerEnvelope: Send + Debug {
     type Actor: Actor;
 
-    fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>);
+    async fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>);
 
     fn get_actor_id(&self) -> <<Self as ManagerEnvelope>::Actor as Actor>::Id;
 }
@@ -80,18 +81,19 @@ impl<A: Handle<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
         self.actor_id.clone()
     }
 
-    pub fn deliver(&mut self, manager: &mut ActorProxy<A>) {
+    pub async fn deliver(&mut self, manager: &mut ActorProxy<A>) {
         if let Some(message) = self.message.take() {
-            manager.send(message);
+            manager.send(message).await;
         }
     }
 }
 
+#[async_trait]
 impl<A: Actor + Handle<M>, M: 'static + Send + Debug> ManagerEnvelope for ManagerLetter<A, M> {
     type Actor = A;
 
-    fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>) {
-        ManagerLetter::<A, M>::deliver(self, manager)
+    async fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>) {
+        ManagerLetter::<A, M>::deliver(self, manager).await
     }
 
     fn get_actor_id(&self) -> A::Id {

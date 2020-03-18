@@ -48,7 +48,7 @@ impl<A: Actor> ActorProxy<A> {
         }
     }
 
-    pub fn send<M: 'static>(&mut self, message: M)
+    pub async fn send<M: 'static>(&mut self, message: M)
     where
         A: Handle<M>,
         M: Send + Debug,
@@ -57,14 +57,10 @@ impl<A: Actor> ActorProxy<A> {
 
         let message = Letter::<A, M>::new(message);
 
-        let sender = self.sender.clone();
-
         // TODO: Handle the channel disconnection properly
-        spawn(async move {
-            sender
-                .send(ActorProxyCommand::Dispatch(Box::new(message)))
-                .await;
-        });
+        self.sender
+            .send(ActorProxyCommand::Dispatch(Box::new(message)))
+            .await;
     }
 
     pub fn get_last_sent_message_time(&self) -> SystemTime {

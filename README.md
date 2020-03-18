@@ -49,6 +49,7 @@ Regarding the implementation:
 - [ ] Fan-out messages
 - [x] Actor self stop
 - [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
+- [ ] RPC like messages between actors
 
 ## Examples
 
