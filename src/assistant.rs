@@ -1,6 +1,4 @@
-use crate::actors_manager::ActorManagerProxyCommand;
-use crate::address_book::AddressBook;
-use crate::envelope::ManagerLetter;
+use crate::system_director::SystemDirector;
 use crate::{Actor, Handle};
 use std::fmt::Debug;
 
@@ -72,14 +70,14 @@ use std::fmt::Debug;
 /// ```
 ///
 pub struct Assistant<A: Actor> {
-    address_book: AddressBook,
+    system_director: SystemDirector,
     actor_id: A::Id,
 }
 
 impl<A: Actor> Assistant<A> {
-    pub(crate) fn new(address_book: AddressBook, actor_id: A::Id) -> Assistant<A> {
+    pub(crate) fn new(system_director: SystemDirector, actor_id: A::Id) -> Assistant<A> {
         Assistant {
-            address_book,
+            system_director,
             actor_id,
         }
     }
@@ -91,36 +89,26 @@ impl<A: Actor> Assistant<A> {
         actor_id: A2::Id,
         message: M,
     ) {
-        if let Some(sender) = self.address_book.get_sender::<A2>() {
-            sender
-                .send(ActorManagerProxyCommand::Dispatch(Box::new(
-                    ManagerLetter::<A2, M>::new(actor_id, message),
-                )))
-                .await;
-        }
+        self.system_director.send::<A2, M>(actor_id, message).await
     }
 
     /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.
     /// Keep in mind that event is an actor is stopped, a new message in the future can wake up the actor.
     pub async fn stop(&self) {
-        if let Some(sender) = self.address_book.get_sender::<A>() {
-            sender
-                .send(ActorManagerProxyCommand::EndActor(self.actor_id.clone()))
-                .await;
-        }
+        self.system_director.stop_actor::<A>(self.actor_id.clone()).await;
     }
 
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub async fn stop_system(&self) {
-        self.address_book.stop_all();
+        self.system_director.stop_all();
     }
 }
 
 impl<A: Actor> Clone for Assistant<A> {
     fn clone(&self) -> Self {
         Assistant {
-            address_book: self.address_book.clone(),
+            system_director: self.system_director.clone(),
             actor_id: self.actor_id.clone(),
         }
     }

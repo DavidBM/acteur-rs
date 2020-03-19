@@ -47,10 +47,12 @@
 //! ```
 //!
 
+#![deny(unsafe_code)]
+
 mod actor;
 mod actor_proxy;
 mod actors_manager;
-mod address_book;
+mod system_director;
 mod assistant;
 mod envelope;
 mod facade;

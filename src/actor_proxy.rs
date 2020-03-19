@@ -1,5 +1,5 @@
 use crate::actors_manager::ActorProxyReport;
-use crate::address_book::AddressBook;
+use crate::system_director::SystemDirector;
 use crate::envelope::{Envelope, Letter};
 use crate::{Actor, Assistant, Handle};
 use async_std::{
@@ -15,6 +15,11 @@ pub(crate) enum ActorProxyCommand<A: Actor> {
     End,
 }
 
+pub struct ActorReport {
+    last_message_on: SystemTime,
+    enqueued_messages: usize,
+}
+
 #[derive(Debug)]
 pub(crate) struct ActorProxy<A: Actor> {
     sender: Sender<ActorProxyCommand<A>>,
@@ -23,14 +28,14 @@ pub(crate) struct ActorProxy<A: Actor> {
 
 impl<A: Actor> ActorProxy<A> {
     pub fn new(
-        address_book: AddressBook,
+        system_director: SystemDirector,
         id: A::Id,
         report_sender: Sender<ActorProxyReport<A>>,
     ) -> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
             channel(5);
 
-        let assistant = Assistant::new(address_book, id.clone());
+        let assistant = Assistant::new(system_director, id.clone());
 
         actor_loop(id, sender.clone(), receiver, assistant, report_sender);
 
@@ -57,6 +62,17 @@ impl<A: Actor> ActorProxy<A> {
 
     pub fn get_last_sent_message_time(&self) -> SystemTime {
         self.last_sent_message_time
+    }
+
+    pub fn get_inbox_length(&self) -> usize {
+        self.sender.len()
+    }
+
+    pub fn get_report(&self) -> ActorReport {
+        ActorReport {
+            last_message_on: self.get_last_sent_message_time(),
+            enqueued_messages: self.get_inbox_length(),
+        }
     }
 
     pub async fn end(&self) {

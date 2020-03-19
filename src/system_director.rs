@@ -1,3 +1,4 @@
+use crate::actor_proxy::ActorReport;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
@@ -7,11 +8,13 @@ use async_std::{
 };
 use dashmap::DashMap;
 use futures::task::AtomicWaker;
-use std::any::{Any, TypeId};
-use std::fmt::Debug;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    any::{Any, TypeId},
+    fmt::Debug,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 pub(crate) enum ActorManagerReport {
     ManagerEnded(TypeId),
@@ -19,7 +22,7 @@ pub(crate) enum ActorManagerReport {
 
 // TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
-pub(crate) struct AddressBook {
+pub(crate) struct SystemDirector {
     senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     manager_report_sender: Sender<ActorManagerReport>,
@@ -27,15 +30,15 @@ pub(crate) struct AddressBook {
     waker: Arc<AtomicWaker>,
 }
 
-impl AddressBook {
-    pub(crate) fn new() -> AddressBook {
+impl SystemDirector {
+    pub(crate) fn new() -> SystemDirector {
         let (sender, receiver) = channel::<ActorManagerReport>(1);
 
         let sender_list = Arc::new(DashMap::new());
         let manager_list = Arc::new(DashMap::new());
         let waker = Arc::new(AtomicWaker::new());
 
-        let address_book = AddressBook {
+        let address_book = SystemDirector {
             senders: sender_list.clone(),
             managers: manager_list.clone(),
             manager_report_sender: sender,
@@ -90,6 +93,17 @@ impl AddressBook {
         }
     }
 
+    pub async fn stop_actor<A: Actor>(
+        &self,
+        actor_id: A::Id
+    ) {
+        if let Some(sender) = self.get_sender::<A>() {
+            sender
+                .send(ActorManagerProxyCommand::EndActor(actor_id))
+                .await;
+        }
+    }
+
     pub(crate) async fn wait_until_stopped(&self) {
         WaitSystemStop::new(self.clone()).await;
     }
@@ -115,6 +129,19 @@ impl AddressBook {
     pub(crate) fn count_actor_managers(&self) -> usize {
         self.managers.len()
     }
+
+    pub(crate) fn get_statistics(&self) -> Vec<(TypeId, Vec<ActorReport>)> {
+        let mut statistics = vec!();
+
+        for manager in self.managers.iter() {
+            statistics.push((
+                manager.get_type_id(),
+                manager.get_statistics()
+            ))
+        }
+
+        statistics
+    }
 }
 
 async fn address_book_report_loop(
@@ -139,9 +166,9 @@ async fn address_book_report_loop(
     }
 }
 
-impl Clone for AddressBook {
+impl Clone for SystemDirector {
     fn clone(&self) -> Self {
-        AddressBook {
+        SystemDirector {
             senders: self.senders.clone(),
             managers: self.managers.clone(),
             manager_report_sender: self.manager_report_sender.clone(),
@@ -150,10 +177,10 @@ impl Clone for AddressBook {
     }
 }
 
-pub(crate) struct WaitSystemStop(AddressBook);
+pub(crate) struct WaitSystemStop(SystemDirector);
 
 impl WaitSystemStop {
-    pub fn new(waker: AddressBook) -> WaitSystemStop {
+    pub fn new(waker: SystemDirector) -> WaitSystemStop {
         WaitSystemStop(waker)
     }
 }

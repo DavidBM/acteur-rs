@@ -1,5 +1,5 @@
-use crate::actor_proxy::ActorProxy;
-use crate::address_book::{ActorManagerReport, AddressBook};
+use crate::actor_proxy::{ActorProxy, ActorReport};
+use crate::system_director::{ActorManagerReport, SystemDirector};
 use crate::envelope::ManagerEnvelope;
 use crate::Actor;
 use async_std::{
@@ -14,6 +14,8 @@ use std::time::{Duration, SystemTime};
 
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
+    fn get_type_id(&self) -> TypeId;
+    fn get_statistics(&self) -> ActorsManagerReport;
 }
 
 #[derive(Debug)]
@@ -29,6 +31,8 @@ pub(crate) enum ActorProxyReport<A: Actor> {
     ActorStopped(A::Id),
 }
 
+pub(crate) type ActorsManagerReport = Vec<ActorReport>;
+
 #[derive(Debug)]
 pub(crate) struct ActorsManager<A: Actor> {
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
@@ -37,7 +41,7 @@ pub(crate) struct ActorsManager<A: Actor> {
 
 impl<A: Actor> ActorsManager<A> {
     pub fn new(
-        address_book: AddressBook,
+        system_director: SystemDirector,
         manager_report_sender: Sender<ActorManagerReport>,
     ) -> ActorsManager<A> {
         // Channel in order to receive commands (like sending messages to actors, stopping, etc)
@@ -54,7 +58,7 @@ impl<A: Actor> ActorsManager<A> {
             receiver,
             sender.clone(),
             actors.clone(),
-            address_book,
+            system_director,
             report_sender,
             is_ending.clone(),
         ));
@@ -81,9 +85,19 @@ impl<A: Actor> ActorsManager<A> {
         self.sender.clone()
     }
 
-    /*pub(crate) fn count(&self) -> usize {W
-        self.actors.len()
-    }*/
+    pub(crate) fn get_type_id(&self) -> TypeId {
+        TypeId::of::<A>()
+    }
+
+    pub(crate) fn get_statistics(&self) -> ActorsManagerReport {
+        let mut report = vec!();
+
+        for actor in self.actors.iter() {
+            report.push(actor.get_report());
+        }
+
+        report
+    }
 }
 
 #[derive(Debug)]
@@ -96,14 +110,14 @@ async fn actor_manager_loop<A: Actor>(
     receiver: Receiver<ActorManagerProxyCommand<A>>,
     sender: Sender<ActorManagerProxyCommand<A>>,
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
-    address_book: AddressBook,
+    system_director: SystemDirector,
     report_sender: Sender<ActorProxyReport<A>>,
     is_ending: Arc<AtomicBool>,
 ) {
     while let Some(command) = receiver.recv().await {
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
-                process_dispatch_command(command, &actors, &address_book, &report_sender).await;
+                process_dispatch_command(command, &actors, &system_director, &report_sender).await;
             }
             ActorManagerProxyCommand::EndActor(id) => {
                 if let Some(actor) = actors.get_mut(&id) {
@@ -119,7 +133,7 @@ async fn actor_manager_loop<A: Actor>(
                     &receiver,
                     &actors,
                     &sender,
-                    &address_book,
+                    &system_director,
                     &report_sender,
                     &is_ending,
                 )
@@ -187,7 +201,7 @@ async fn process_end_command<'a, A: Actor>(
     receiver: &'a Receiver<ActorManagerProxyCommand<A>>,
     actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
     sender: &'a Sender<ActorManagerProxyCommand<A>>,
-    address_book: &'a AddressBook,
+    system_director: &'a SystemDirector,
     report_sender: &'a Sender<ActorProxyReport<A>>,
     is_ending: &'a Arc<AtomicBool>,
 ) -> LoopStatus {
@@ -206,7 +220,7 @@ async fn process_end_command<'a, A: Actor>(
         Some(ActorManagerProxyCommand::Dispatch(command)) => {
             // If there are any message left, we postpone the shutdown.
             sender.send(ActorManagerProxyCommand::End).await;
-            process_dispatch_command(command, &actors, &address_book, &report_sender).await;
+            process_dispatch_command(command, &actors, &system_director, &report_sender).await;
             LoopStatus::Continue
         }
         _ => unreachable!(),
@@ -216,7 +230,7 @@ async fn process_end_command<'a, A: Actor>(
 async fn process_dispatch_command<'a, A: Actor>(
     mut command: Box<dyn ManagerEnvelope<Actor = A>>,
     actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
-    address_book: &'a AddressBook,
+    system_director: &'a SystemDirector,
     report_sender: &'a Sender<ActorProxyReport<A>>,
 ) {
     let actor_id = command.get_actor_id();
@@ -227,7 +241,7 @@ async fn process_dispatch_command<'a, A: Actor>(
     }
 
     let mut actor = ActorProxy::<A>::new(
-        address_book.clone(),
+        system_director.clone(),
         actor_id.clone(),
         report_sender.clone(),
     );
@@ -273,4 +287,13 @@ impl<A: Actor> Manager for ActorsManager<A> {
     fn end(&self) {
         ActorsManager::<A>::end(self);
     }
+
+    fn get_type_id(&self) -> TypeId{
+        ActorsManager::<A>::get_type_id(self)
+    }
+
+    fn get_statistics(&self) -> ActorsManagerReport{
+        ActorsManager::<A>::get_statistics(self)
+    }
+
 }

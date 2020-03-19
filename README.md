@@ -1,7 +1,7 @@
 <h1 align="center">Acteur Actor System</h1>
 <div align="center">
  <strong>
-   An actor system written in Rust that just works. Simple, robust, fast, documented.
+   A safe actor system written in Rust that just works. Simple, robust, fast, documented.
  </strong>
 </div>
 
@@ -31,25 +31,26 @@ Acteur uses async_std under the hood. This actor system work under the following
 
 Regarding the implementation:
 
- - Actors have an ID
+ - Actors have an ID which type is defined by the user for each Actor type
  - Messages are routed to an Actor and an ID
  - Actor life-cycle is automatically handled by the framework
  - Actors are automatically de/allocated depending of their usage
- - Messages for the same Actor & ID are ordered. Everything else is executed in concurrently.
+ - Messages for the same Actor & ID are ordered. Everything else is executed concurrently.
 
 ## State of the implementation
 
 - [x] Actor is activated on first message
 - [x] Actor can send messages to other actors
 - [x] System can send messages to any actor
-- [ ] System statistics
-- [ ] Automatic deallocation of unused actors
+- [x] Actor self stop
 - [x] Stop waits for all actors to consume all messages
+- [x] System statistics
+- [ ] Automatic deallocation of unused actors
 - [ ] Subscribe to message
 - [ ] Fan-out messages
-- [x] Actor self stop
-- [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 - [ ] RPC like messages between actors
+- [ ] Services (statefull or stateless, like actors, without ID and processing messages concurrently)
+- [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 
 ## Examples
 
@@ -91,6 +92,10 @@ fn main() {
     sys.wait_until_stopped();
 }
 ```
+
+## Safe Rust
+
+No unsafe code was directly used in this crate. You can check in lib.rs the `#![deny(unsafe_code)]` line.
 
 ## License
 
