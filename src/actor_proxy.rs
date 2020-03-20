@@ -99,7 +99,7 @@ fn actor_loop<A: Actor>(
                     ActorProxyCommand::End => {
                         // We may find cases where we can have several End command in a row. In that case,
                         // we want to consume all the end command together until we find nothing or a not-end command
-                        match recv_until_not_end_command(receiver.clone()).await {
+                        match recv_until_command_or_end!(receiver, ActorProxyCommand::End).await {
                             None => {
                                 actor.deactivate().await;
                                 report_sender.send(ActorProxyReport::ActorStopped(id)).await;
@@ -117,27 +117,4 @@ fn actor_loop<A: Actor>(
             }
         });
     });
-}
-
-async fn recv_until_not_end_command<A: Actor>(
-    receiver: Receiver<ActorProxyCommand<A>>,
-) -> Option<ActorProxyCommand<A>> {
-    if receiver.is_empty() {
-        return None;
-    }
-
-    while let Some(command) = receiver.recv().await {
-        match command {
-            ActorProxyCommand::Dispatch(_) => return Some(command),
-            ActorProxyCommand::End => {
-                if receiver.is_empty() {
-                    return None;
-                } else {
-                    continue;
-                }
-            }
-        }
-    }
-
-    None
 }

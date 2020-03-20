@@ -49,6 +49,8 @@
 
 #![deny(unsafe_code)]
 
+#[macro_use]
+mod utils;
 mod actor;
 mod actor_assistant;
 mod actor_proxy;

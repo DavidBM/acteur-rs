@@ -212,7 +212,7 @@ async fn process_end_command<'a, A: Actor>(
     // We may find cases where we can have several End command in a row. In that case,
     // we want to consume all the end command together until we totally consume the messages
     // or we find a not-end command
-    match recv_until_not_end_command(receiver.clone()).await {
+    match recv_until_command_or_end!(receiver, ActorManagerProxyCommand::End).await {
         None => {
             for actor in actors.iter() {
                 actor.end().await;
@@ -251,29 +251,6 @@ async fn process_dispatch_command<'a, A: Actor>(
     command.deliver(&mut actor).await;
 
     actors.insert(actor_id, actor);
-}
-
-async fn recv_until_not_end_command<A: Actor>(
-    receiver: Receiver<ActorManagerProxyCommand<A>>,
-) -> Option<ActorManagerProxyCommand<A>> {
-    if receiver.is_empty() {
-        return None;
-    }
-
-    while let Some(command) = receiver.recv().await {
-        match command {
-            ActorManagerProxyCommand::End => {
-                if receiver.is_empty() {
-                    return None;
-                } else {
-                    continue;
-                }
-            }
-            _ => return Some(command),
-        }
-    }
-
-    None
 }
 
 impl<A: Actor> Clone for ActorsManager<A> {
