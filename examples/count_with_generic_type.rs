@@ -15,7 +15,7 @@ pub fn start() {
 
     let sys = Acteur::new();
 
-    for i in 0..4u32 {
+    for i in 0..1u32 {
         let message = TestMessage { field: i };
 
         sys.send_sync::<TestActor<u32>, TestMessage>(43, message);
@@ -56,13 +56,13 @@ impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug> Actor for TestActor<T
 #[async_trait]
 impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug> Handle<TestMessage> for TestActor<T> {
     async fn handle(&mut self, message: TestMessage, assistant: &Assistant<TestActor<T>>) {
-        println!(
+        /*println!(
             "I'm actor {:?} and I'm sending a message for actor {:?}",
             self.id,
             message.field + 1
-        );
+        );*/
 
-        if message.field > 1_000_000 {
+        if message.field > 3_000_000 {
             println!("Time of end: {:?}", SystemTime::now());
             return assistant.stop_system().await;
         }

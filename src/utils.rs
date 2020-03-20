@@ -15,15 +15,15 @@ macro_rules! recv_until_command_or_end {
                             } else {
                                 continue;
                             }
-                        },
+                        }
                         _ => {
                             return_command = Some(command);
-                            break
-                        },
+                            break;
+                        }
                     }
                 }
                 return_command
-            } 
+            }
         }
     };
 }

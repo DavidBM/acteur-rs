@@ -256,7 +256,7 @@ impl<A: Actor> Manager for ActorsManager<A> {
         Box::new(ActorsManager::<A>::get_sender(self))
     }
 
-    fn end_filtered(&self, filter_fn: &Box<dyn Fn(ActorReport) -> bool>) { 
+    fn end_filtered(&self, filter_fn: &Box<dyn Fn(ActorReport) -> bool>) {
         ActorsManager::<A>::end_filtered(self, filter_fn);
     }
 }

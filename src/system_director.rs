@@ -1,8 +1,8 @@
 use crate::actor_proxy::ActorReport;
+use crate::actors_lifecycle_director::ActorsLifecycleDirector;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
-use crate::actors_lifecycle_director::ActorsLifecycleDirector;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task,
@@ -29,7 +29,8 @@ pub(crate) struct SystemDirector {
     manager_report_sender: Sender<ActorManagerReport>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
-    lifecycle_director: Arc<Option<ActorsLifecycleDirector>>
+    // TODO: I don't like this
+    lifecycle_director: Arc<Option<ActorsLifecycleDirector>>,
 }
 
 impl SystemDirector {
@@ -46,8 +47,9 @@ impl SystemDirector {
             lifecycle_director: Arc::new(None),
         };
 
-        let lifecycle_director = ActorsLifecycleDirector::new(system_director.clone(), 300);
+        let lifecycle_director = ActorsLifecycleDirector::new(system_director.clone(), 60);
 
+        // TODO: I don't like this
         *Arc::make_mut(&mut system_director.lifecycle_director) = Some(lifecycle_director);
 
         task::spawn(system_director_report_loop(receiver, manager_list, waker));
