@@ -1,6 +1,6 @@
 use crate::actors_manager::ActorProxyReport;
-use crate::system_director::SystemDirector;
 use crate::envelope::{Envelope, Letter};
+use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Handle};
 use async_std::{
     sync::{channel, Receiver, Sender},

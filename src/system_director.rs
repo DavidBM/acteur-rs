@@ -6,6 +6,7 @@ use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task,
 };
+use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use futures::task::AtomicWaker;
 use std::{
@@ -15,7 +16,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use dashmap::mapref::entry::Entry;
 
 pub(crate) enum ActorManagerReport {
     ManagerEnded(TypeId),
@@ -24,7 +24,7 @@ pub(crate) enum ActorManagerReport {
 // TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
 pub(crate) struct SystemDirector {
-    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,  // DELETE ?
+    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>, // DELETE ?
     manager_report_sender: Sender<ActorManagerReport>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
@@ -43,11 +43,7 @@ impl SystemDirector {
             waker: waker.clone(),
         };
 
-        task::spawn(address_book_report_loop(
-            receiver,
-            manager_list,
-            waker,
-        ));
+        task::spawn(address_book_report_loop(receiver, manager_list, waker));
 
         address_book
     }
@@ -58,19 +54,20 @@ impl SystemDirector {
 
         let managers_entry = self.managers.entry(type_id);
 
-        let ref mut manager = match managers_entry {
+        let any_sender = match managers_entry {
             Entry::Occupied(entry) => entry.into_ref(),
             Entry::Vacant(entry) => {
                 let manager = self.create::<A>();
                 entry.insert(Box::new(manager))
             }
-        };
+        }
+        .get_sender_as_any();
 
-        match manager.get_sender_as_any().downcast_mut::<Sender<ActorManagerProxyCommand<A>>>() {
-            Some(sender) => sender.clone(),
+        match any_sender.downcast::<Sender<ActorManagerProxyCommand<A>>>() {
+            Ok(sender) => *sender,
             // If type is not matching, crash as  we don't really want to
-            // run the framework with a bug like this
-            None => unreachable!(),
+            // run the framework with a bug like that
+            Err(_) => unreachable!(),
         }
     }
 
@@ -121,7 +118,6 @@ impl SystemDirector {
 
         statistics
     }
-
 }
 
 async fn address_book_report_loop(

@@ -58,7 +58,8 @@ impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug> Handle<TestMessage> f
     async fn handle(&mut self, message: TestMessage, assistant: &Assistant<TestActor<T>>) {
         println!(
             "I'm actor {:?} and I'm sending a message for actor {:?}",
-            self.id, message.field + 1
+            self.id,
+            message.field + 1
         );
 
         if message.field > 1_000_000 {

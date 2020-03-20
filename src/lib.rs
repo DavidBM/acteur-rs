@@ -50,13 +50,13 @@
 #![deny(unsafe_code)]
 
 mod actor;
+mod actor_assistant;
 mod actor_proxy;
 mod actors_manager;
-mod system_director;
-mod actor_assistant;
 mod envelope;
 mod facade;
 mod handle;
+mod system_director;
 
 pub use actor::Actor;
 pub use actor_assistant::Assistant;

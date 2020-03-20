@@ -1,13 +1,13 @@
-use std::any::Any;
 use crate::actor_proxy::{ActorProxy, ActorReport};
-use crate::system_director::{ActorManagerReport, SystemDirector};
 use crate::envelope::ManagerEnvelope;
+use crate::system_director::{ActorManagerReport, SystemDirector};
 use crate::Actor;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task,
 };
 use dashmap::DashMap;
+use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,7 +17,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ActorsManagerReport;
-    fn get_sender_as_any(&self) -> Box<dyn Any + Send + Sync>;
+    fn get_sender_as_any(&self) -> Box<dyn Any>;
 }
 
 #[derive(Debug)]
@@ -92,7 +92,7 @@ impl<A: Actor> ActorsManager<A> {
     }
 
     pub(crate) fn get_statistics(&self) -> ActorsManagerReport {
-        let mut report = vec!();
+        let mut report = vec![];
 
         for actor in self.actors.iter() {
             report.push(actor.get_report());
@@ -290,16 +290,15 @@ impl<A: Actor> Manager for ActorsManager<A> {
         ActorsManager::<A>::end(self);
     }
 
-    fn get_type_id(&self) -> TypeId{
+    fn get_type_id(&self) -> TypeId {
         ActorsManager::<A>::get_type_id(self)
     }
 
-    fn get_statistics(&self) -> ActorsManagerReport{
+    fn get_statistics(&self) -> ActorsManagerReport {
         ActorsManager::<A>::get_statistics(self)
     }
 
-    fn get_sender_as_any(&self) -> Box<dyn Any + Sync + Send>{
+    fn get_sender_as_any(&self) -> Box<dyn Any> {
         Box::new(ActorsManager::<A>::get_sender(self))
     }
-
 }

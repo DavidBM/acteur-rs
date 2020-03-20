@@ -1,9 +1,9 @@
-use std::any::TypeId;
 use crate::actor_proxy::ActorReport;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Handle};
 use async_std::task;
 use lazy_static::lazy_static;
+use std::any::TypeId;
 use std::fmt::Debug;
 
 // We do this in order to keep all the actors in the same system. If not, two calls
