@@ -2,6 +2,7 @@ use crate::actor_proxy::ActorReport;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
+use crate::actors_lifecycle_director::ActorsLifecycleDirector;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task,
@@ -28,6 +29,7 @@ pub(crate) struct SystemDirector {
     manager_report_sender: Sender<ActorManagerReport>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
+    lifecycle_director: Arc<Option<ActorsLifecycleDirector>>
 }
 
 impl SystemDirector {
@@ -37,15 +39,20 @@ impl SystemDirector {
         let manager_list = Arc::new(DashMap::new());
         let waker = Arc::new(AtomicWaker::new());
 
-        let address_book = SystemDirector {
+        let mut system_director = SystemDirector {
             managers: manager_list.clone(),
             manager_report_sender: sender,
             waker: waker.clone(),
+            lifecycle_director: Arc::new(None),
         };
 
-        task::spawn(address_book_report_loop(receiver, manager_list, waker));
+        let lifecycle_director = ActorsLifecycleDirector::new(system_director.clone(), 300);
 
-        address_book
+        *Arc::make_mut(&mut system_director.lifecycle_director) = Some(lifecycle_director);
+
+        task::spawn(system_director_report_loop(receiver, manager_list, waker));
+
+        system_director
     }
 
     // Ensures that there is a manager for that type and returns a sender to it
@@ -95,13 +102,17 @@ impl SystemDirector {
 
     pub(crate) fn create<A: Actor>(&self) -> ActorsManager<A> {
         // TOOD: Check if sending self and the Sender makes sense as the Sender is already in self.
-        // Removing the sender here may allow to remove the address_book_report_loop.
+        // Removing the sender here may allow to remove the system_director_report_loop.
         ActorsManager::<A>::new(self.clone(), self.manager_report_sender.clone())
     }
 
-    pub(crate) fn stop_all(&self) {
+    pub(crate) fn stop_system(&self) {
         for manager in self.managers.iter() {
             manager.end();
+        }
+
+        if let Some(director) = self.lifecycle_director.as_ref() {
+            director.stop();
         }
     }
 
@@ -118,9 +129,16 @@ impl SystemDirector {
 
         statistics
     }
+
+    pub(crate) fn end_filtered(&self, filter_fn: Box<dyn Fn(ActorReport) -> bool>) {
+        let filter_fn = Box::new(filter_fn);
+        for manager in self.managers.iter() {
+            manager.end_filtered(&filter_fn);
+        }
+    }
 }
 
-async fn address_book_report_loop(
+async fn system_director_report_loop(
     receiver: Receiver<ActorManagerReport>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     waker: Arc<AtomicWaker>,
@@ -144,6 +162,7 @@ impl Clone for SystemDirector {
             managers: self.managers.clone(),
             manager_report_sender: self.manager_report_sender.clone(),
             waker: self.waker.clone(),
+            lifecycle_director: self.lifecycle_director.clone(),
         }
     }
 }

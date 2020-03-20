@@ -4,7 +4,7 @@ use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Handle};
 use async_std::{
     sync::{channel, Receiver, Sender},
-    task::spawn,
+    task,
 };
 use std::fmt::Debug;
 use std::time::SystemTime;
@@ -16,8 +16,8 @@ pub(crate) enum ActorProxyCommand<A: Actor> {
 }
 
 pub struct ActorReport {
-    last_message_on: SystemTime,
-    enqueued_messages: usize,
+    pub last_message_on: SystemTime,
+    pub enqueued_messages: usize,
 }
 
 #[derive(Debug)]
@@ -75,8 +75,11 @@ impl<A: Actor> ActorProxy<A> {
         }
     }
 
-    pub async fn end(&self) {
-        self.sender.send(ActorProxyCommand::End).await;
+    pub fn end(&self) {
+        let sender = self.sender.clone();
+        task::spawn(async move {
+            sender.send(ActorProxyCommand::End).await;
+        });
     }
 }
 
@@ -87,10 +90,10 @@ fn actor_loop<A: Actor>(
     assistant: Assistant<A>,
     report_sender: Sender<ActorProxyReport<A>>,
 ) {
-    spawn(async move {
+    task::spawn(async move {
         let mut actor = A::activate(id.clone()).await;
 
-        spawn(async move {
+        task::spawn(async move {
             while let Some(command) = receiver.recv().await {
                 match command {
                     ActorProxyCommand::Dispatch(mut envelope) => {

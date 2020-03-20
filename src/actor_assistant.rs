@@ -103,7 +103,7 @@ impl<A: Actor> Assistant<A> {
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub async fn stop_system(&self) {
-        self.system_director.stop_all();
+        self.system_director.stop_system();
     }
 }
 

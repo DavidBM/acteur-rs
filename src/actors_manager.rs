@@ -11,20 +11,19 @@ use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, SystemTime};
 
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ActorsManagerReport;
     fn get_sender_as_any(&self) -> Box<dyn Any>;
+    fn end_filtered(&self, filter_fn: &Box<dyn Fn(ActorReport) -> bool>);
 }
 
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
     EndActor(A::Id),
-    EndOldActors(Duration),
     End,
 }
 
@@ -100,6 +99,14 @@ impl<A: Actor> ActorsManager<A> {
 
         report
     }
+
+    pub(crate) fn end_filtered(&self, filter_fn: &Box<dyn Fn(ActorReport) -> bool>) {
+        for actor in self.actors.iter() {
+            if !filter_fn(actor.get_report()) {
+                actor.end();
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -123,12 +130,9 @@ async fn actor_manager_loop<A: Actor>(
             }
             ActorManagerProxyCommand::EndActor(id) => {
                 if let Some(actor) = actors.get_mut(&id) {
-                    actor.end().await;
+                    actor.end();
                     return;
                 }
-            }
-            ActorManagerProxyCommand::EndOldActors(clean_duration) => {
-                process_end_old_actors_command(&actors, clean_duration).await;
             }
             ActorManagerProxyCommand::End => {
                 let loop_continuity = process_end_command(
@@ -172,33 +176,6 @@ async fn actor_proxy_report_loop<A: Actor>(
     }
 }
 
-async fn process_end_old_actors_command<'a, A: Actor>(
-    actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
-    clean_duration: Duration,
-) {
-    let now = SystemTime::now();
-    //let mut ended_actors = 0;
-    for (index, actor) in actors.iter().enumerate() {
-        let last_message = actor.get_last_sent_message_time();
-
-        match now.duration_since(last_message) {
-            Ok(dur) if dur >= clean_duration => {
-                //ended_actors += 1;
-                actor.end().await;
-            }
-            Err(_) => unreachable!(),
-            _ => (),
-        }
-
-        // In the case we have many many actors, we don't want to block for long
-        // Maybe it is premature optimization, but I feel that having 100K+ actors
-        // and iterating in all of them can take long enough to have a 1 sec pause
-        if index % 1000 == 0 {
-            task::yield_now().await;
-        }
-    }
-}
-
 async fn process_end_command<'a, A: Actor>(
     receiver: &'a Receiver<ActorManagerProxyCommand<A>>,
     actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
@@ -215,7 +192,7 @@ async fn process_end_command<'a, A: Actor>(
     match recv_until_command_or_end!(receiver, ActorManagerProxyCommand::End).await {
         None => {
             for actor in actors.iter() {
-                actor.end().await;
+                actor.end();
             }
             LoopStatus::Stop
         }
@@ -277,5 +254,9 @@ impl<A: Actor> Manager for ActorsManager<A> {
 
     fn get_sender_as_any(&self) -> Box<dyn Any> {
         Box::new(ActorsManager::<A>::get_sender(self))
+    }
+
+    fn end_filtered(&self, filter_fn: &Box<dyn Fn(ActorReport) -> bool>) { 
+        ActorsManager::<A>::end_filtered(self, filter_fn);
     }
 }
