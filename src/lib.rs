@@ -53,12 +53,12 @@ mod actor;
 mod actor_proxy;
 mod actors_manager;
 mod system_director;
-mod assistant;
+mod actor_assistant;
 mod envelope;
 mod facade;
 mod handle;
 
 pub use actor::Actor;
-pub use assistant::Assistant;
+pub use actor_assistant::Assistant;
 pub use facade::Acteur;
 pub use handle::Handle;

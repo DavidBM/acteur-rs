@@ -1,3 +1,4 @@
+use std::any::Any;
 use crate::actor_proxy::{ActorProxy, ActorReport};
 use crate::system_director::{ActorManagerReport, SystemDirector};
 use crate::envelope::ManagerEnvelope;
@@ -16,6 +17,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ActorsManagerReport;
+    fn get_sender_as_any(&self) -> Box<dyn Any + Send + Sync>;
 }
 
 #[derive(Debug)]
@@ -294,6 +296,10 @@ impl<A: Actor> Manager for ActorsManager<A> {
 
     fn get_statistics(&self) -> ActorsManagerReport{
         ActorsManager::<A>::get_statistics(self)
+    }
+
+    fn get_sender_as_any(&self) -> Box<dyn Any + Sync + Send>{
+        Box::new(ActorsManager::<A>::get_sender(self))
     }
 
 }

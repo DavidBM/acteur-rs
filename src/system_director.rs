@@ -9,12 +9,13 @@ use async_std::{
 use dashmap::DashMap;
 use futures::task::AtomicWaker;
 use std::{
-    any::{Any, TypeId},
+    any::TypeId,
     fmt::Debug,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+use dashmap::mapref::entry::Entry;
 
 pub(crate) enum ActorManagerReport {
     ManagerEnded(TypeId),
@@ -23,8 +24,7 @@ pub(crate) enum ActorManagerReport {
 // TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
 pub(crate) struct SystemDirector {
-    senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
-    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
+    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,  // DELETE ?
     manager_report_sender: Sender<ActorManagerReport>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
@@ -34,12 +34,10 @@ impl SystemDirector {
     pub(crate) fn new() -> SystemDirector {
         let (sender, receiver) = channel::<ActorManagerReport>(1);
 
-        let sender_list = Arc::new(DashMap::new());
         let manager_list = Arc::new(DashMap::new());
         let waker = Arc::new(AtomicWaker::new());
 
         let address_book = SystemDirector {
-            senders: sender_list.clone(),
             managers: manager_list.clone(),
             manager_report_sender: sender,
             waker: waker.clone(),
@@ -47,7 +45,6 @@ impl SystemDirector {
 
         task::spawn(address_book_report_loop(
             receiver,
-            sender_list,
             manager_list,
             waker,
         ));
@@ -55,26 +52,24 @@ impl SystemDirector {
         address_book
     }
 
-    pub(crate) fn get_sender<A>(&self) -> Option<Sender<ActorManagerProxyCommand<A>>>
-    where
-        A: Actor,
-    {
+    // Ensures that there is a manager for that type and returns a sender to it
+    fn get_or_create_manager_sender<A: Actor>(&self) -> Sender<ActorManagerProxyCommand<A>> {
         let type_id = TypeId::of::<A>();
 
-        let mut sender = match self.senders.get_mut(&type_id) {
-            Some(manager) => manager,
-            None => {
-                // TODO: Check if the creation of new actors should be really here
-                self.create::<A>();
-                match self.senders.get_mut(&type_id) {
-                    Some(manager) => manager,
-                    None => unreachable!(),
-                }
+        let managers_entry = self.managers.entry(type_id);
+
+        let ref mut manager = match managers_entry {
+            Entry::Occupied(entry) => entry.into_ref(),
+            Entry::Vacant(entry) => {
+                let manager = self.create::<A>();
+                entry.insert(Box::new(manager))
             }
         };
 
-        match sender.downcast_mut::<Sender<ActorManagerProxyCommand<A>>>() {
-            Some(sender) => Some(sender.clone()),
+        match manager.get_sender_as_any().downcast_mut::<Sender<ActorManagerProxyCommand<A>>>() {
+            Some(sender) => sender.clone(),
+            // If type is not matching, crash as  we don't really want to
+            // run the framework with a bug like this
             None => unreachable!(),
         }
     }
@@ -84,40 +79,27 @@ impl SystemDirector {
         actor_id: A::Id,
         message: M,
     ) {
-        if let Some(sender) = self.get_sender::<A>() {
-            sender
-                .send(ActorManagerProxyCommand::Dispatch(Box::new(
-                    ManagerLetter::new(actor_id, message),
-                )))
-                .await;
-        }
+        self.get_or_create_manager_sender::<A>()
+            .send(ActorManagerProxyCommand::Dispatch(Box::new(
+                ManagerLetter::new(actor_id, message),
+            )))
+            .await;
     }
 
-    pub async fn stop_actor<A: Actor>(
-        &self,
-        actor_id: A::Id
-    ) {
-        if let Some(sender) = self.get_sender::<A>() {
-            sender
-                .send(ActorManagerProxyCommand::EndActor(actor_id))
-                .await;
-        }
+    pub async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
+        self.get_or_create_manager_sender::<A>()
+            .send(ActorManagerProxyCommand::EndActor(actor_id))
+            .await;
     }
 
     pub(crate) async fn wait_until_stopped(&self) {
         WaitSystemStop::new(self.clone()).await;
     }
 
-    pub(crate) fn create<A: Actor>(&self) {
+    pub(crate) fn create<A: Actor>(&self) -> ActorsManager<A> {
         // TOOD: Check if sending self and the Sender makes sense as the Sender is already in self.
         // Removing the sender here may allow to remove the address_book_report_loop.
-        let manager = ActorsManager::<A>::new(self.clone(), self.manager_report_sender.clone());
-        let sender = manager.get_sender();
-
-        let type_id = TypeId::of::<A>();
-
-        self.senders.insert(type_id, Box::new(sender));
-        self.managers.insert(type_id, Box::new(manager));
+        ActorsManager::<A>::new(self.clone(), self.manager_report_sender.clone())
     }
 
     pub(crate) fn stop_all(&self) {
@@ -126,41 +108,35 @@ impl SystemDirector {
         }
     }
 
-    pub(crate) fn count_actor_managers(&self) -> usize {
+    pub(crate) fn get_actor_managers_count(&self) -> usize {
         self.managers.len()
     }
 
     pub(crate) fn get_statistics(&self) -> Vec<(TypeId, Vec<ActorReport>)> {
-        let mut statistics = vec!();
+        let mut statistics = vec![];
 
         for manager in self.managers.iter() {
-            statistics.push((
-                manager.get_type_id(),
-                manager.get_statistics()
-            ))
+            statistics.push((manager.get_type_id(), manager.get_statistics()))
         }
 
         statistics
     }
+
 }
 
 async fn address_book_report_loop(
     receiver: Receiver<ActorManagerReport>,
-    senders: Arc<DashMap<TypeId, Box<dyn Any + Send + Sync>>>,
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     waker: Arc<AtomicWaker>,
 ) {
     while let Some(report) = receiver.recv().await {
         match report {
             ActorManagerReport::ManagerEnded(id) => {
-                senders.remove(&id);
                 managers.remove(&id);
 
-                match (senders.is_empty(), managers.is_empty()) {
-                    (true, true) => waker.wake(),
-                    (false, true) | (true, false) => unreachable!(),
-                    (false, false) => (),
-                };
+                if managers.is_empty() {
+                    waker.wake();
+                }
             }
         }
     }
@@ -169,7 +145,6 @@ async fn address_book_report_loop(
 impl Clone for SystemDirector {
     fn clone(&self) -> Self {
         SystemDirector {
-            senders: self.senders.clone(),
             managers: self.managers.clone(),
             manager_report_sender: self.manager_report_sender.clone(),
             waker: self.waker.clone(),
@@ -189,7 +164,7 @@ impl Future for WaitSystemStop {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        if self.0.count_actor_managers() > 0 {
+        if self.0.get_actor_managers_count() > 0 {
             self.0.waker.register(cx.waker());
             Poll::Pending
         } else {
