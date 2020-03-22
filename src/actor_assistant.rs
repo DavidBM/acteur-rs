@@ -95,8 +95,9 @@ impl<A: Actor> Assistant<A> {
     /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.
     /// Keep in mind that event is an actor is stopped, a new message in the future can wake up the actor.
     pub async fn stop(&self) {
+        let type_id = std::any::TypeId::of::<A>();
         self.system_director
-            .stop_actor::<A>(self.actor_id.clone())
+            .stop_actor(type_id, Box::new(self.actor_id.clone()))
             .await;
     }
 

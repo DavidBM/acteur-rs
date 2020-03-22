@@ -54,7 +54,6 @@ mod utils;
 mod actor;
 mod actor_assistant;
 mod actor_proxy;
-mod actors_lifecycle_director;
 mod actors_manager;
 mod envelope;
 mod facade;

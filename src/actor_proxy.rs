@@ -1,4 +1,10 @@
-use crate::actors_manager::ActorProxyReport;
+use futures::task::AtomicWaker;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Context;
+use std::task::Poll;
+
 use crate::envelope::{Envelope, Letter};
 use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Handle};
@@ -24,24 +30,30 @@ pub struct ActorReport {
 pub(crate) struct ActorProxy<A: Actor> {
     sender: Sender<ActorProxyCommand<A>>,
     last_sent_message_time: SystemTime,
+    // This should be a waker set
+    on_end_waker: Arc<AtomicWaker>,
 }
 
 impl<A: Actor> ActorProxy<A> {
-    pub fn new(
-        system_director: SystemDirector,
-        id: A::Id,
-        report_sender: Sender<ActorProxyReport<A>>,
-    ) -> ActorProxy<A> {
+    pub fn new(system_director: SystemDirector, id: A::Id) -> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
             channel(5);
 
         let assistant = Assistant::new(system_director, id.clone());
+        let on_end_waker = Arc::new(AtomicWaker::new());
 
-        actor_loop(id, sender.clone(), receiver, assistant, report_sender);
+        actor_loop(
+            id,
+            sender.clone(),
+            receiver,
+            assistant,
+            on_end_waker.clone(),
+        );
 
         ActorProxy {
             sender,
             last_sent_message_time: SystemTime::now(),
+            on_end_waker,
         }
     }
 
@@ -75,11 +87,14 @@ impl<A: Actor> ActorProxy<A> {
         }
     }
 
-    pub fn end(&self) {
+    pub fn end(&self) -> impl Future<Output = ()> + 'static {
+
         let sender = self.sender.clone();
         task::spawn(async move {
             sender.send(ActorProxyCommand::End).await;
         });
+
+        WaitActorEnd::new(self.on_end_waker.clone(), self.sender.clone())
     }
 }
 
@@ -88,36 +103,60 @@ fn actor_loop<A: Actor>(
     sender: Sender<ActorProxyCommand<A>>,
     receiver: Receiver<ActorProxyCommand<A>>,
     assistant: Assistant<A>,
-    report_sender: Sender<ActorProxyReport<A>>,
+    on_end_waker: Arc<AtomicWaker>,
 ) {
     task::spawn(async move {
         let mut actor = A::activate(id.clone()).await;
 
         task::spawn(async move {
-            while let Some(command) = receiver.recv().await {
-                match command {
-                    ActorProxyCommand::Dispatch(mut envelope) => {
-                        envelope.dispatch(&mut actor, &assistant).await
-                    }
-                    ActorProxyCommand::End => {
-                        // We may find cases where we can have several End command in a row. In that case,
-                        // we want to consume all the end command together until we find nothing or a not-end command
-                        match recv_until_command_or_end!(receiver, ActorProxyCommand::End).await {
-                            None => {
-                                actor.deactivate().await;
-                                report_sender.send(ActorProxyReport::ActorStopped(id)).await;
-                                break;
+            loop {
+                if let Some(command) = receiver.recv().await {
+                    match command {
+                        ActorProxyCommand::Dispatch(mut envelope) => {
+                            envelope.dispatch(&mut actor, &assistant).await
+                        }
+                        ActorProxyCommand::End => {
+                            // We may find cases where we can have several End command in a row. In that case,
+                            // we want to consume all the end command together until we find nothing or a not-end command
+                            match recv_until_command_or_end!(receiver, ActorProxyCommand::End).await
+                            {
+                                None => {
+                                    actor.deactivate().await;
+                                    on_end_waker.wake();
+                                    break;
+                                }
+                                Some(ActorProxyCommand::Dispatch(mut envelope)) => {
+                                    // If there are any message left, we postpone the shutdown.
+                                    sender.send(ActorProxyCommand::End).await;
+                                    envelope.dispatch(&mut actor, &assistant).await
+                                }
+                                _ => unreachable!(),
                             }
-                            Some(ActorProxyCommand::Dispatch(mut envelope)) => {
-                                // If there are any message left, we postpone the shutdown.
-                                sender.send(ActorProxyCommand::End).await;
-                                envelope.dispatch(&mut actor, &assistant).await
-                            }
-                            _ => unreachable!(),
                         }
                     }
                 }
             }
         });
     });
+}
+
+pub(crate) struct WaitActorEnd<A: Actor>(Arc<AtomicWaker>, Sender<ActorProxyCommand<A>>);
+
+impl<A: Actor> WaitActorEnd<A> {
+    pub fn new(waker: Arc<AtomicWaker>, sender: Sender<ActorProxyCommand<A>>) -> WaitActorEnd<A> {
+        WaitActorEnd(waker, sender)
+    }
+}
+
+impl<A: Actor> Future for WaitActorEnd<A> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        if self.1.len() > 0 {
+            self.0.register(cx.waker());
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    }
 }

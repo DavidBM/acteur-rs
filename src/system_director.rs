@@ -1,15 +1,15 @@
-use crate::actor_proxy::ActorReport;
-use crate::actors_lifecycle_director::ActorsLifecycleDirector;
-use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
+use std::any::Any;
+use crate::actor_proxy::{ActorReport};
+use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager, ActorEndResult};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
 use async_std::{
-    sync::{channel, Arc, Receiver, Sender},
     task,
+    sync::{Arc, Sender},
 };
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
-use futures::task::AtomicWaker;
+use futures::{task::AtomicWaker};
 use std::{
     any::TypeId,
     fmt::Debug,
@@ -18,43 +18,24 @@ use std::{
     task::{Context, Poll},
 };
 
-pub(crate) enum ActorManagerReport {
-    ManagerEnded(TypeId),
-}
-
 // TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
 pub(crate) struct SystemDirector {
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>, // DELETE ?
-    manager_report_sender: Sender<ActorManagerReport>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
-    // TODO: I don't like this
-    lifecycle_director: Arc<Option<ActorsLifecycleDirector>>,
 }
 
 impl SystemDirector {
     pub(crate) fn new() -> SystemDirector {
-        let (sender, receiver) = channel::<ActorManagerReport>(1);
 
         let manager_list = Arc::new(DashMap::new());
         let waker = Arc::new(AtomicWaker::new());
 
-        let mut system_director = SystemDirector {
+        SystemDirector {
             managers: manager_list.clone(),
-            manager_report_sender: sender,
             waker: waker.clone(),
-            lifecycle_director: Arc::new(None),
-        };
-
-        let lifecycle_director = ActorsLifecycleDirector::new(system_director.clone(), 60);
-
-        // TODO: I don't like this
-        *Arc::make_mut(&mut system_director.lifecycle_director) = Some(lifecycle_director);
-
-        task::spawn(system_director_report_loop(receiver, manager_list, waker));
-
-        system_director
+        }
     }
 
     // Ensures that there is a manager for that type and returns a sender to it
@@ -92,10 +73,16 @@ impl SystemDirector {
             .await;
     }
 
-    pub async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
-        self.get_or_create_manager_sender::<A>()
-            .send(ActorManagerProxyCommand::EndActor(actor_id))
-            .await;
+    pub async fn stop_actor(&self, type_id: TypeId, actor_id: Box<dyn Any + Send>) {
+
+        if let Some(manager) = self.managers.get(&type_id) {
+            match manager.end_actor(Box::new(actor_id)).await {
+                ActorEndResult::ActorManagerEmptyAndTerminated => {
+                    self.managers.remove(&type_id);
+                },
+                _ => ()
+            }
+        }
     }
 
     pub(crate) async fn wait_until_stopped(&self) {
@@ -105,16 +92,15 @@ impl SystemDirector {
     pub(crate) fn create<A: Actor>(&self) -> ActorsManager<A> {
         // TOOD: Check if sending self and the Sender makes sense as the Sender is already in self.
         // Removing the sender here may allow to remove the system_director_report_loop.
-        ActorsManager::<A>::new(self.clone(), self.manager_report_sender.clone())
+        ActorsManager::<A>::new(self.clone())
     }
 
     pub(crate) fn stop_system(&self) {
+        let mut handlers = vec!();
         for manager in self.managers.iter() {
-            manager.end();
-        }
-
-        if let Some(director) = self.lifecycle_director.as_ref() {
-            director.stop();
+            //TODO: This is wrong. The whole model is wrong as the end command should be message and the "remove myself" from the queue should be the sync part. 
+            let manager = self.managers.remove(manager.key()).unwrap().1;
+            handlers.push(task::spawn(async move {manager.end();}));
         }
     }
 
@@ -131,40 +117,13 @@ impl SystemDirector {
 
         statistics
     }
-
-    pub(crate) fn end_filtered(&self, filter_fn: Box<dyn Fn(ActorReport) -> bool>) {
-        let filter_fn = Box::new(filter_fn);
-        for manager in self.managers.iter() {
-            manager.end_filtered(&filter_fn);
-        }
-    }
-}
-
-async fn system_director_report_loop(
-    receiver: Receiver<ActorManagerReport>,
-    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
-    waker: Arc<AtomicWaker>,
-) {
-    while let Some(report) = receiver.recv().await {
-        match report {
-            ActorManagerReport::ManagerEnded(id) => {
-                managers.remove(&id);
-
-                if managers.is_empty() {
-                    waker.wake();
-                }
-            }
-        }
-    }
 }
 
 impl Clone for SystemDirector {
     fn clone(&self) -> Self {
         SystemDirector {
             managers: self.managers.clone(),
-            manager_report_sender: self.manager_report_sender.clone(),
             waker: self.waker.clone(),
-            lifecycle_director: self.lifecycle_director.clone(),
         }
     }
 }
