@@ -1,6 +1,5 @@
-use std::any::Any;
 use crate::actor_proxy::{ActorReport};
-use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager, ActorEndResult};
+use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
 use async_std::{
@@ -73,16 +72,10 @@ impl SystemDirector {
             .await;
     }
 
-    pub async fn stop_actor(&self, type_id: TypeId, actor_id: Box<dyn Any + Send>) {
-
-        if let Some(manager) = self.managers.get(&type_id) {
-            match manager.end_actor(Box::new(actor_id)).await {
-                ActorEndResult::ActorManagerEmptyAndTerminated => {
-                    self.managers.remove(&type_id);
-                },
-                _ => ()
-            }
-        }
+    pub async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
+          self.get_or_create_manager_sender::<A>()
+            .send(ActorManagerProxyCommand::EndActor(actor_id))
+            .await;
     }
 
     pub(crate) async fn wait_until_stopped(&self) {
@@ -116,6 +109,17 @@ impl SystemDirector {
         }
 
         statistics
+    }
+
+    /// Internal function for removing an actor from the main HashMap. This function is used in the second 
+    /// part of the actor ending process. Being the first one sending a message sent to the ActorProxy we 
+    /// want to end. 
+    pub(crate) fn remove_actor<A: Actor>(&self, actor_id: A::Id) {
+        let type_id = TypeId::of::<A>();
+        match self.managers.get(&type_id) {
+            Some(manager) => manager.remove_actor(Box::new(actor_id)),
+            None => (),
+        }
     }
 }
 

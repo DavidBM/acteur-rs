@@ -18,12 +18,13 @@ pub(crate) trait Manager: Send + Sync + Debug {
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ActorsManagerReport;
     fn get_sender_as_any(&self) -> Box<dyn Any>;
-    async fn end_actor(&self, actor_id: Box<dyn Any + Send>) -> ActorEndResult;
+    fn remove_actor(&self, actor_id: Box<dyn Any + Send>);
 }
 
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
+    EndActor(A::Id)
 }
 
 pub(crate) type ActorsManagerReport = Vec<ActorReport>;
@@ -60,7 +61,7 @@ impl<A: Actor> ActorsManager<A> {
 
         for actor in self.actors.iter() {
             self.actors.remove(actor.key());
-            actor.end().await;
+            actor.end();
         }
     }
 
@@ -82,31 +83,9 @@ impl<A: Actor> ActorsManager<A> {
         report
     }
 
-    pub(crate) async fn end_actor(&self, actor_id: &A::Id) -> ActorEndResult {
-        if let Some((_, actor)) = self.actors.remove(&actor_id) {
-            actor.end().await;
-
-            if self.actors.is_empty() {
-                if self.is_ending.load(Ordering::Relaxed) {
-                    ActorEndResult::ActorManagerEmptyAndTerminated
-                } else {
-                    ActorEndResult::ActorManagerEmpty
-                }
-            } else {
-                ActorEndResult::ActorTerminated
-            }
-        } else {
-            ActorEndResult::ActorNotFound
-        }
+    pub(crate) fn remove_actor(&self, actor_id: A::Id) {
+        self.actors.remove(&actor_id);
     }
-}
-
-#[derive(Debug)]
-pub enum ActorEndResult {
-    ActorTerminated,
-    ActorNotFound,
-    ActorManagerEmpty,
-    ActorManagerEmptyAndTerminated,
 }
 
 async fn actor_manager_loop<A: Actor>(
@@ -118,8 +97,20 @@ async fn actor_manager_loop<A: Actor>(
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
                 process_dispatch_command(command, &actors, &system_director).await;
+            },
+            ActorManagerProxyCommand::EndActor(actor_id) => {
+                process_end_actor_command(actor_id, &actors).await;
             }
         }
+    }
+}
+
+async fn process_end_actor_command<'a, A: Actor>(
+    actor_id: A::Id,
+    actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
+) {
+    if let Some(actor) = actors.get_mut(&actor_id) {
+        actor.end();
     }
 }
 
@@ -173,11 +164,10 @@ impl<A: Actor> Manager for ActorsManager<A> {
         Box::new(ActorsManager::<A>::get_sender(self))
     }
 
-    async fn end_actor(&self, actor_id: Box<dyn Any + Send>) -> ActorEndResult {
-        if let Ok(actor_id) =  actor_id.downcast::<A::Id>() {
-            ActorsManager::<A>::end_actor(self, &actor_id).await
-        } else {
-            unreachable!()
+    fn remove_actor(&self, actor_id: Box<dyn Any + Send>) {
+        match actor_id.downcast::<A::Id>(){
+            Ok(actor_id) => ActorsManager::<A>::remove_actor(self, *actor_id),
+            Err(_) => (),
         }
     }
 }

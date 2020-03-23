@@ -1,10 +1,3 @@
-use futures::task::AtomicWaker;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
-
 use crate::envelope::{Envelope, Letter};
 use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Handle};
@@ -30,8 +23,6 @@ pub struct ActorReport {
 pub(crate) struct ActorProxy<A: Actor> {
     sender: Sender<ActorProxyCommand<A>>,
     last_sent_message_time: SystemTime,
-    // This should be a waker set
-    on_end_waker: Arc<AtomicWaker>,
 }
 
 impl<A: Actor> ActorProxy<A> {
@@ -40,20 +31,17 @@ impl<A: Actor> ActorProxy<A> {
             channel(5);
 
         let assistant = Assistant::new(system_director, id.clone());
-        let on_end_waker = Arc::new(AtomicWaker::new());
 
         actor_loop(
             id,
             sender.clone(),
             receiver,
             assistant,
-            on_end_waker.clone(),
         );
 
         ActorProxy {
             sender,
             last_sent_message_time: SystemTime::now(),
-            on_end_waker,
         }
     }
 
@@ -87,14 +75,11 @@ impl<A: Actor> ActorProxy<A> {
         }
     }
 
-    pub fn end(&self) -> impl Future<Output = ()> + 'static {
-
+    pub fn end(&self) {
         let sender = self.sender.clone();
         task::spawn(async move {
             sender.send(ActorProxyCommand::End).await;
         });
-
-        WaitActorEnd::new(self.on_end_waker.clone(), self.sender.clone())
     }
 }
 
@@ -103,7 +88,6 @@ fn actor_loop<A: Actor>(
     sender: Sender<ActorProxyCommand<A>>,
     receiver: Receiver<ActorProxyCommand<A>>,
     assistant: Assistant<A>,
-    on_end_waker: Arc<AtomicWaker>,
 ) {
     task::spawn(async move {
         let mut actor = A::activate(id.clone()).await;
@@ -121,8 +105,16 @@ fn actor_loop<A: Actor>(
                             match recv_until_command_or_end!(receiver, ActorProxyCommand::End).await
                             {
                                 None => {
+                                    // TODO: This method may allow the creation of new actors during the deactivate 
+                                    // method call. If there were remaining messages in the queue, that would allow
+                                    // to process messages out of order.
+
+                                    // We remove the actor, which makes impossible to send new messages.
+                                    assistant.remove_actor();
+                                    // We deactivate it
                                     actor.deactivate().await;
-                                    on_end_waker.wake();
+                                    // Then we take any remaining message and requeue it
+                                    task::spawn(enqueue_not_end_commands(sender, receiver));
                                     break;
                                 }
                                 Some(ActorProxyCommand::Dispatch(mut envelope)) => {
@@ -140,23 +132,26 @@ fn actor_loop<A: Actor>(
     });
 }
 
-pub(crate) struct WaitActorEnd<A: Actor>(Arc<AtomicWaker>, Sender<ActorProxyCommand<A>>);
-
-impl<A: Actor> WaitActorEnd<A> {
-    pub fn new(waker: Arc<AtomicWaker>, sender: Sender<ActorProxyCommand<A>>) -> WaitActorEnd<A> {
-        WaitActorEnd(waker, sender)
+async fn enqueue_not_end_commands<A: Actor>(
+    sender: Sender<ActorProxyCommand<A>>,
+    receiver: Receiver<ActorProxyCommand<A>>,
+) {
+    if receiver.is_empty() {
+        return;
     }
-}
 
-impl<A: Actor> Future for WaitActorEnd<A> {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        if self.1.len() > 0 {
-            self.0.register(cx.waker());
-            Poll::Pending
-        } else {
-            Poll::Ready(())
+    while let Some(command) = receiver.recv().await {
+        match command {
+            ActorProxyCommand::End => {
+                if receiver.is_empty() {
+                    break;
+                } else {
+                    continue;
+                }
+            }
+            _ => {
+                sender.send(command).await;
+            }
         }
     }
 }
