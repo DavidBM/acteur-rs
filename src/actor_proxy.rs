@@ -105,14 +105,14 @@ fn actor_loop<A: Actor>(
                             match recv_until_command_or_end!(receiver, ActorProxyCommand::End).await
                             {
                                 None => {
-                                    // TODO: This method may allow the creation of new actors during the deactivate 
-                                    // method call. If there were remaining messages in the queue, that would allow
-                                    // to process messages out of order.
+                                    // TODO: This method may allow the creation of new actors during the small time 
+                                    // between the removal of the actor and the requeue of the messages (if any). 
+                                    // An small chance, but still technically possible. 
 
-                                    // We remove the actor, which makes impossible to send new messages.
-                                    assistant.remove_actor();
                                     // We deactivate it
                                     actor.deactivate().await;
+                                    // We remove the actor, which makes impossible to send new messages.
+                                    assistant.remove_actor();
                                     // Then we take any remaining message and requeue it
                                     task::spawn(enqueue_not_end_commands(sender, receiver));
                                     break;
