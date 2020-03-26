@@ -1,14 +1,14 @@
-use crate::actor_proxy::{ActorReport};
+use crate::actor_proxy::ActorReport;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
 use async_std::{
-    task,
     sync::{Arc, Sender},
+    task,
 };
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
-use futures::{task::AtomicWaker};
+use dashmap::{mapref::entry::Entry, DashMap};
+use futures::future::join_all;
+use futures::task::AtomicWaker;
 use std::{
     any::TypeId,
     fmt::Debug,
@@ -27,7 +27,6 @@ pub(crate) struct SystemDirector {
 
 impl SystemDirector {
     pub(crate) fn new() -> SystemDirector {
-
         let manager_list = Arc::new(DashMap::new());
         let waker = Arc::new(AtomicWaker::new());
 
@@ -46,7 +45,7 @@ impl SystemDirector {
         let any_sender = match managers_entry {
             Entry::Occupied(entry) => entry.into_ref(),
             Entry::Vacant(entry) => {
-                let manager = self.create::<A>();
+                let manager = self.create_manager::<A>();
                 entry.insert(Box::new(manager))
             }
         }
@@ -73,7 +72,7 @@ impl SystemDirector {
     }
 
     pub async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
-          self.get_or_create_manager_sender::<A>()
+        self.get_or_create_manager_sender::<A>()
             .send(ActorManagerProxyCommand::EndActor(actor_id))
             .await;
     }
@@ -82,19 +81,24 @@ impl SystemDirector {
         WaitSystemStop::new(self.clone()).await;
     }
 
-    pub(crate) fn create<A: Actor>(&self) -> ActorsManager<A> {
-        // TOOD: Check if sending self and the Sender makes sense as the Sender is already in self.
-        // Removing the sender here may allow to remove the system_director_report_loop.
+    pub(crate) fn create_manager<A: Actor>(&self) -> ActorsManager<A> {
         ActorsManager::<A>::new(self.clone())
     }
 
-    pub(crate) fn stop_system(&self) {
-        let mut handlers = vec!();
+    // TODO: This is wrong. The shutdown method should keep the managers until they report no actors left.
+    // The managers should keep the state "ending" and make sure that next time they get 0 actors and 0
+    // messages, they report as ended. Same for the system that should just fullfill the future of ending.
+    // That or blocking completely any new message sending, but I don't like that idea.
+    pub(crate) async fn stop(&self) {
+        let mut futures = vec![];
         for manager in self.managers.iter() {
-            //TODO: This is wrong. The whole model is wrong as the end command should be message and the "remove myself" from the queue should be the sync part. 
             let manager = self.managers.remove(manager.key()).unwrap().1;
-            handlers.push(task::spawn(async move {manager.end();}));
+            futures.push(task::spawn(async move {
+                manager.end();
+            }));
         }
+
+        join_all(futures).await;
     }
 
     pub(crate) fn get_actor_managers_count(&self) -> usize {
@@ -109,17 +113,6 @@ impl SystemDirector {
         }
 
         statistics
-    }
-
-    /// Internal function for removing an actor from the main HashMap. This function is used in the second 
-    /// part of the actor ending process. Being the first one sending a message sent to the ActorProxy we 
-    /// want to end. 
-    pub(crate) fn remove_actor<A: Actor>(&self, actor_id: A::Id) {
-        let type_id = TypeId::of::<A>();
-        match self.managers.get(&type_id) {
-            Some(manager) => manager.remove_actor(Box::new(actor_id)),
-            None => (),
-        }
     }
 }
 

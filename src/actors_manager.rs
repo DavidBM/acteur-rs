@@ -6,6 +6,7 @@ use async_std::{
     sync::{channel, Arc, Receiver, Sender},
     task,
 };
+use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
@@ -24,7 +25,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
-    EndActor(A::Id)
+    EndActor(A::Id),
 }
 
 pub(crate) type ActorsManagerReport = Vec<ActorReport>;
@@ -37,23 +38,28 @@ pub(crate) struct ActorsManager<A: Actor> {
 }
 
 impl<A: Actor> ActorsManager<A> {
-    pub fn new(
-        system_director: SystemDirector,
-    ) -> ActorsManager<A> {
+    pub fn new(system_director: SystemDirector) -> ActorsManager<A> {
         // Channel in order to receive commands (like sending messages to actors, stopping, etc)
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
 
         let actors = Arc::new(DashMap::new());
         let is_ending = Arc::new(AtomicBool::new(false));
 
+        let manager = ActorsManager {
+            actors: actors.clone(),
+            sender,
+            is_ending,
+        };
+
         // Loop for processing commands
         task::spawn(actor_manager_loop(
             receiver,
-            actors.clone(),
+            actors,
             system_director,
+            manager.clone(),
         ));
 
-        ActorsManager { actors, sender, is_ending }
+        manager
     }
 
     pub(crate) async fn end(&self) {
@@ -86,18 +92,25 @@ impl<A: Actor> ActorsManager<A> {
     pub(crate) fn remove_actor(&self, actor_id: A::Id) {
         self.actors.remove(&actor_id);
     }
+
+    /// Returns the Entry of the actorProxy in the general HashMap, making not possible to send any messages
+    /// until the Entry is droped.
+    pub(crate) fn get_own_slot_blocking(&self, id: A::Id) -> Entry<A::Id, ActorProxy<A>> {
+        self.actors.entry(id)
+    }
 }
 
 async fn actor_manager_loop<A: Actor>(
     receiver: Receiver<ActorManagerProxyCommand<A>>,
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
     system_director: SystemDirector,
+    manager: ActorsManager<A>,
 ) {
     while let Some(command) = receiver.recv().await {
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
-                process_dispatch_command(command, &actors, &system_director).await;
-            },
+                process_dispatch_command(command, &actors, &system_director, &manager).await;
+            }
             ActorManagerProxyCommand::EndActor(actor_id) => {
                 process_end_actor_command(actor_id, &actors).await;
             }
@@ -118,6 +131,7 @@ async fn process_dispatch_command<'a, A: Actor>(
     mut command: Box<dyn ManagerEnvelope<Actor = A>>,
     actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
     system_director: &'a SystemDirector,
+    manager: &'a ActorsManager<A>,
 ) {
     let actor_id = command.get_actor_id();
 
@@ -126,10 +140,8 @@ async fn process_dispatch_command<'a, A: Actor>(
         return;
     }
 
-    let mut actor = ActorProxy::<A>::new(
-        system_director.clone(),
-        actor_id.clone(),
-    );
+    let mut actor =
+        ActorProxy::<A>::new(system_director.clone(), manager.clone(), actor_id.clone());
 
     command.deliver(&mut actor).await;
 
@@ -165,7 +177,7 @@ impl<A: Actor> Manager for ActorsManager<A> {
     }
 
     fn remove_actor(&self, actor_id: Box<dyn Any + Send>) {
-        match actor_id.downcast::<A::Id>(){
+        match actor_id.downcast::<A::Id>() {
             Ok(actor_id) => ActorsManager::<A>::remove_actor(self, *actor_id),
             Err(_) => (),
         }

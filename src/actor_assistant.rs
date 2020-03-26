@@ -1,5 +1,7 @@
+use crate::actors_manager::ActorsManager;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Handle};
+use async_std::task;
 use std::fmt::Debug;
 
 /// This object is provided to the [Handle](./trait.Handle.html) method for each message that an Actor receives
@@ -72,13 +74,19 @@ use std::fmt::Debug;
 pub struct Assistant<A: Actor> {
     system_director: SystemDirector,
     actor_id: A::Id,
+    manager: ActorsManager<A>,
 }
 
 impl<A: Actor> Assistant<A> {
-    pub(crate) fn new(system_director: SystemDirector, actor_id: A::Id) -> Assistant<A> {
+    pub(crate) fn new(
+        system_director: SystemDirector,
+        manager: ActorsManager<A>,
+        actor_id: A::Id,
+    ) -> Assistant<A> {
         Assistant {
             system_director,
             actor_id,
+            manager,
         }
     }
 
@@ -103,11 +111,11 @@ impl<A: Actor> Assistant<A> {
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub async fn stop_system(&self) {
-        self.system_director.stop_system();
-    }
+        let system = self.system_director.clone();
 
-    pub(crate) fn remove_actor(&self) {
-        self.system_director.remove_actor::<A>(self.actor_id.clone());
+        task::spawn(async move {
+            system.stop().await;
+        });
     }
 }
 
@@ -116,6 +124,7 @@ impl<A: Actor> Clone for Assistant<A> {
         Assistant {
             system_director: self.system_director.clone(),
             actor_id: self.actor_id.clone(),
+            manager: self.manager.clone(),
         }
     }
 }

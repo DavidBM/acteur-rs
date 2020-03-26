@@ -57,7 +57,10 @@ impl Acteur {
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub fn stop(&self) {
-        self.system_director.stop_system();
+        let system = self.system_director.clone();
+        task::spawn(async move {
+            system.stop().await;
+        });
     }
 
     /// Waits until all actors are stopped.
