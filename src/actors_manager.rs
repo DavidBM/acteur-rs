@@ -11,14 +11,16 @@ use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[async_trait::async_trait]
 pub(crate) trait Manager: Send + Sync + Debug {
-    async fn end(&self);
+    fn end(&self);
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ActorsManagerReport;
     fn get_sender_as_any(&self) -> Box<dyn Any>;
+    fn is_empty(&self) -> bool;
     fn remove_actor(&self, actor_id: Box<dyn Any + Send>);
 }
 
@@ -35,6 +37,7 @@ pub(crate) struct ActorsManager<A: Actor> {
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
     sender: Sender<ActorManagerProxyCommand<A>>,
     is_ending: Arc<AtomicBool>,
+    system_director: SystemDirector,
 }
 
 impl<A: Actor> ActorsManager<A> {
@@ -48,7 +51,8 @@ impl<A: Actor> ActorsManager<A> {
         let manager = ActorsManager {
             actors: actors.clone(),
             sender,
-            is_ending,
+            is_ending: is_ending.clone(),
+            system_director: system_director.clone(),
         };
 
         // Loop for processing commands
@@ -57,18 +61,51 @@ impl<A: Actor> ActorsManager<A> {
             actors,
             system_director,
             manager.clone(),
+            is_ending,
         ));
 
         manager
     }
 
-    pub(crate) async fn end(&self) {
+    // TODO: This is wrong. We want to remove the ActorProxy only if the ActorProxy
+    // chooses to. And when it chooses to.
+    pub(crate) fn end(&self) {
         self.is_ending.store(true, Ordering::Relaxed);
 
         for actor in self.actors.iter() {
-            self.actors.remove(actor.key());
             actor.end();
         }
+    }
+
+    pub(crate) fn signal_actor_removed(&self) {
+        // Maybe becayse it is not marked to be removed, or because there are still actors or because
+        // there are still remaining messages to be sent.
+        if !self.is_ready_to_be_removed() {
+            return;
+        }
+        // If it can be removed, we block the System HashMap entry
+        let entry = self
+            .system_director
+            .get_blocking_manager_entry(std::any::TypeId::of::<A>());
+
+        // Double check that any more messages were received during the preivous line
+        // and that no new actors were created.
+        if !self.is_ready_to_be_removed() {
+            return;
+        }
+
+        // Remove the entry from the system HashMap
+        if let Entry::Occupied(entry) = entry {
+            entry.remove();
+        }
+
+        self.system_director.signal_manager_removed();
+    }
+
+    /// A manager is ready to be removed only if there are no more messages pending to be delivered,
+    /// has no active actors and it is flagged to be ended.
+    fn is_ready_to_be_removed(&self) -> bool {
+        self.is_ending.load(Ordering::Relaxed) && self.actors.is_empty() && self.sender.is_empty()
     }
 
     pub(crate) fn get_sender(&self) -> Sender<ActorManagerProxyCommand<A>> {
@@ -95,8 +132,12 @@ impl<A: Actor> ActorsManager<A> {
 
     /// Returns the Entry of the actorProxy in the general HashMap, making not possible to send any messages
     /// until the Entry is droped.
-    pub(crate) fn get_own_slot_blocking(&self, id: A::Id) -> Entry<A::Id, ActorProxy<A>> {
+    pub(crate) fn get_blocking_actor_entry(&self, id: A::Id) -> Entry<A::Id, ActorProxy<A>> {
         self.actors.entry(id)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.actors.is_empty() && self.sender.is_empty()
     }
 }
 
@@ -105,11 +146,13 @@ async fn actor_manager_loop<A: Actor>(
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
     system_director: SystemDirector,
     manager: ActorsManager<A>,
+    is_ending: Arc<AtomicBool>,
 ) {
     while let Some(command) = receiver.recv().await {
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
-                process_dispatch_command(command, &actors, &system_director, &manager).await;
+                process_dispatch_command(command, &actors, &system_director, &manager, &is_ending)
+                    .await;
             }
             ActorManagerProxyCommand::EndActor(actor_id) => {
                 process_end_actor_command(actor_id, &actors).await;
@@ -132,6 +175,7 @@ async fn process_dispatch_command<'a, A: Actor>(
     actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
     system_director: &'a SystemDirector,
     manager: &'a ActorsManager<A>,
+    is_ending: &'a Arc<AtomicBool>,
 ) {
     let actor_id = command.get_actor_id();
 
@@ -145,6 +189,10 @@ async fn process_dispatch_command<'a, A: Actor>(
 
     command.deliver(&mut actor).await;
 
+    if is_ending.load(Relaxed) {
+        actor.end();
+    }
+
     actors.insert(actor_id, actor);
 }
 
@@ -154,14 +202,15 @@ impl<A: Actor> Clone for ActorsManager<A> {
             actors: self.actors.clone(),
             sender: self.sender.clone(),
             is_ending: self.is_ending.clone(),
+            system_director: self.system_director.clone(),
         }
     }
 }
 
 #[async_trait::async_trait]
 impl<A: Actor> Manager for ActorsManager<A> {
-    async fn end(&self) {
-        ActorsManager::<A>::end(self).await;
+    fn end(&self) {
+        ActorsManager::<A>::end(self)
     }
 
     fn get_type_id(&self) -> TypeId {
@@ -170,6 +219,10 @@ impl<A: Actor> Manager for ActorsManager<A> {
 
     fn get_statistics(&self) -> ActorsManagerReport {
         ActorsManager::<A>::get_statistics(self)
+    }
+
+    fn is_empty(&self) -> bool {
+        ActorsManager::<A>::is_empty(self)
     }
 
     fn get_sender_as_any(&self) -> Box<dyn Any> {

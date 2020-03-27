@@ -2,13 +2,10 @@ use crate::actor_proxy::ActorReport;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
 use crate::{Actor, Handle};
-use async_std::{
-    sync::{Arc, Sender},
-    task,
-};
+use async_std::sync::{Arc, Sender};
 use dashmap::{mapref::entry::Entry, DashMap};
-use futures::future::join_all;
 use futures::task::AtomicWaker;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::{
     any::TypeId,
     fmt::Debug,
@@ -23,6 +20,7 @@ pub(crate) struct SystemDirector {
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>, // DELETE ?
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
+    is_stopping: Arc<AtomicBool>,
 }
 
 impl SystemDirector {
@@ -33,6 +31,7 @@ impl SystemDirector {
         SystemDirector {
             managers: manager_list.clone(),
             waker: waker.clone(),
+            is_stopping: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -85,24 +84,22 @@ impl SystemDirector {
         ActorsManager::<A>::new(self.clone())
     }
 
-    // TODO: This is wrong. The shutdown method should keep the managers until they report no actors left.
-    // The managers should keep the state "ending" and make sure that next time they get 0 actors and 0
-    // messages, they report as ended. Same for the system that should just fullfill the future of ending.
-    // That or blocking completely any new message sending, but I don't like that idea.
-    pub(crate) async fn stop(&self) {
-        let mut futures = vec![];
-        for manager in self.managers.iter() {
-            let manager = self.managers.remove(manager.key()).unwrap().1;
-            futures.push(task::spawn(async move {
-                manager.end();
-            }));
+    pub(crate) fn signal_manager_removed(&self) {
+        if self.is_stopping.load(Relaxed) && self.managers.is_empty() {
+            self.waker.wake();
         }
-
-        join_all(futures).await;
     }
 
-    pub(crate) fn get_actor_managers_count(&self) -> usize {
-        self.managers.len()
+    pub(crate) async fn stop(&self) {
+        self.is_stopping.store(true, Relaxed);
+
+        for manager in self.managers.iter() {
+            manager.end();
+        }
+    }
+
+    pub(crate) fn get_blocking_manager_entry(&self, id: TypeId) -> Entry<TypeId, Box<dyn Manager>> {
+        self.managers.entry(id)
     }
 
     pub(crate) fn get_statistics(&self) -> Vec<(TypeId, Vec<ActorReport>)> {
@@ -121,6 +118,7 @@ impl Clone for SystemDirector {
         SystemDirector {
             managers: self.managers.clone(),
             waker: self.waker.clone(),
+            is_stopping: self.is_stopping.clone(),
         }
     }
 }
@@ -137,7 +135,7 @@ impl Future for WaitSystemStop {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        if self.0.get_actor_managers_count() > 0 {
+        if self.0.is_stopping.load(Relaxed) && self.0.managers.is_empty() {
             self.0.waker.register(cx.waker());
             Poll::Pending
         } else {

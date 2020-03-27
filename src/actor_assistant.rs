@@ -110,7 +110,7 @@ impl<A: Actor> Assistant<A> {
 
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
-    pub async fn stop_system(&self) {
+    pub fn stop_system(&self) {
         let system = self.system_director.clone();
 
         task::spawn(async move {

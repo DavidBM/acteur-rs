@@ -124,14 +124,14 @@ fn actor_loop<A: Actor>(
                             match recv_until_command_or_end!(receiver, ActorProxyCommand::End).await
                             {
                                 // We start the actor ending process.
-                                Some(ActorProxyCommand::End) | None => {
+                                None | Some(ActorProxyCommand::End) => {
                                     // We take the entry for this A::Id until we finish cleaning everything up.
                                     // This blocks any entry trying to get the ActorProxy in order to send messages.
                                     // Also, if any new message is sent to this actor, it will block the whole
                                     // message sending to this actor family. That is why we do it only after
                                     // checking that there are not more messages left, and therefore, reducing
                                     // the chances of blocking the whole message sending in the actor family.
-                                    let entry = manager.get_own_slot_blocking(id.clone());
+                                    let entry = manager.get_blocking_actor_entry(id.clone());
 
                                     // We check again if there is any remainign message and, if any,
                                     // we requeue it and abort the ending.
@@ -149,11 +149,13 @@ fn actor_loop<A: Actor>(
                                             // and process the found message
                                             envelope.dispatch(&mut actor, &assistant).await
                                         }
-                                        Some(ActorProxyCommand::End) | None => {
+                                        None | Some(ActorProxyCommand::End) => {
                                             // If not messages are found, we just remove the actor from the HashMap
                                             if let Occupied(entry) = entry {
                                                 entry.remove();
                                             }
+
+                                            manager.signal_actor_removed();
                                             // and stop the main loop
                                             break;
                                         }
