@@ -1,3 +1,5 @@
+use std::future::Future;
+use std::pin::Pin;
 use crate::actors_manager::ActorsManager;
 use crate::envelope::{Envelope, Letter};
 use crate::system_director::SystemDirector;
@@ -10,12 +12,14 @@ use dashmap::mapref::entry::Entry::Occupied;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
-#[derive(Debug)]
+pub(crate) type ActorProxyTask<A> =
+    Box<dyn FnOnce(&mut A, &Assistant<A>) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + 'static>;
+
 pub(crate) enum ActorProxyCommand<A: Actor> {
     Dispatch(Box<dyn Envelope<Actor = A>>),
+    Exec(ActorProxyTask<A>),
     End,
 }
-
 pub struct ActorReport {
     pub last_message_on: SystemTime,
     pub enqueued_messages: usize,
@@ -101,6 +105,9 @@ fn actor_loop<A: Actor>(
                         ActorProxyCommand::Dispatch(mut envelope) => {
                             envelope.dispatch(&mut actor, &assistant).await
                         }
+                        ActorProxyCommand::Exec(handler) => {
+                            handler(&mut actor, &assistant).await
+                        }
                         // The end process is a bit complicated. We don't want that if a End message
                         // is issued at the same time that someone else is sending a message we process
                         // messages out of order, or in paralle, or not at all.
@@ -149,6 +156,14 @@ fn actor_loop<A: Actor>(
                                             // and process the found message
                                             envelope.dispatch(&mut actor, &assistant).await
                                         }
+                                        Some(ActorProxyCommand::Exec(handler)) => {
+                                            // We stop blocking the entry as we will continue receiving messages
+                                            drop(entry);
+                                            // We postpone the ending of the actor
+                                            sender.send(ActorProxyCommand::End).await;
+                                            // and process the found message
+                                            handler(&mut actor, &assistant).await
+                                        }
                                         None | Some(ActorProxyCommand::End) => {
                                             // If not messages are found, we just remove the actor from the HashMap
                                             if let Occupied(entry) = entry {
@@ -168,6 +183,12 @@ fn actor_loop<A: Actor>(
                                     // and process the found message
                                     envelope.dispatch(&mut actor, &assistant).await
                                 }
+                                Some(ActorProxyCommand::Exec(handler)) => {
+                                    // If there are any message left, we postpone the shutdown.
+                                    sender.send(ActorProxyCommand::End).await;
+                                    // and process the found message
+                                    handler(&mut actor, &assistant).await
+                                }
                             }
                         }
                     }
@@ -175,4 +196,19 @@ fn actor_loop<A: Actor>(
             }
         });
     });
+}
+
+impl <A: Actor> Debug for ActorProxyCommand<A> {
+
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+
+        let name = match self {
+            ActorProxyCommand::Dispatch(_) => "Dispatch",
+            ActorProxyCommand::Exec(_) => "Exec",
+            ActorProxyCommand::End => "End",
+        };
+
+        fmt.debug_tuple(format!("ActorProxyCommand::{}", name).as_str())
+            .finish()
+    }
 }
