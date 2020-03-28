@@ -1,6 +1,6 @@
 use crate::actor_proxy::ActorReport;
 use crate::system_director::SystemDirector;
-use crate::{Actor, Handle};
+use crate::{Actor, Receive};
 use async_std::task;
 use lazy_static::lazy_static;
 use std::any::TypeId;
@@ -37,7 +37,7 @@ impl Acteur {
     /// Sends a message to an actor with an ID.
     /// If the actor is not loaded in Ram, this method will load them first
     /// by calling their "activate" method.
-    pub async fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+    pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
@@ -46,7 +46,7 @@ impl Acteur {
     }
 
     /// Same as `send` method, but sync version.
-    pub fn send_sync<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+    pub fn send_sync<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,

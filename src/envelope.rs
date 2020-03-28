@@ -1,5 +1,5 @@
 use crate::actor_proxy::ActorProxy;
-use crate::{Actor, Assistant, Handle};
+use crate::{Actor, Assistant, Receive};
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -33,10 +33,10 @@ pub(crate) struct Letter<A: Actor, M: Debug> {
     phantom: PhantomData<A>,
 }
 
-impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
+impl<A: Receive<M> + Actor, M: Debug> Letter<A, M> {
     pub fn new(message: M) -> Self
     where
-        A: Handle<M>,
+        A: Receive<M>,
     {
         Letter {
             message: Some(message),
@@ -46,13 +46,13 @@ impl<A: Handle<M> + Actor, M: Debug> Letter<A, M> {
 
     pub async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
         if let Some(message) = self.message.take() {
-            <A as Handle<M>>::handle(actor, message, assistant).await;
+            <A as Receive<M>>::handle(actor, message, assistant).await;
         }
     }
 }
 
 #[async_trait]
-impl<A: Actor + Handle<M>, M: Send + Debug> Envelope for Letter<A, M> {
+impl<A: Actor + Receive<M>, M: Send + Debug> Envelope for Letter<A, M> {
     type Actor = A;
 
     async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
@@ -79,10 +79,10 @@ pub(crate) struct ManagerLetter<A: Actor, M: Debug> {
     phantom: PhantomData<A>,
 }
 
-impl<A: Handle<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
+impl<A: Receive<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
     pub fn new(actor_id: A::Id, message: M) -> Self
     where
-        A: Handle<M>,
+        A: Receive<M>,
     {
         ManagerLetter {
             message: Some(message),
@@ -103,7 +103,7 @@ impl<A: Handle<M> + Actor, M: 'static + Send + Debug> ManagerLetter<A, M> {
 }
 
 #[async_trait]
-impl<A: Actor + Handle<M>, M: 'static + Send + Debug> ManagerEnvelope for ManagerLetter<A, M> {
+impl<A: Actor + Receive<M>, M: 'static + Send + Debug> ManagerEnvelope for ManagerLetter<A, M> {
     type Actor = A;
 
     async fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>) {

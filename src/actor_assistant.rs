@@ -1,14 +1,14 @@
 use crate::actors_manager::ActorsManager;
 use crate::system_director::SystemDirector;
-use crate::{Actor, Handle};
+use crate::{Actor, Receive};
 use async_std::task;
 use std::fmt::Debug;
 
-/// This object is provided to the [Handle](./trait.Handle.html) method for each message that an Actor receives
-/// The Actor's assistant allows to send messages and to execute some task over the system.
+/// This object is provided to the handle method in the [Receive](./trait.Receive.html) trait for each message 
+/// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no_run
-/// # use acteur::{Actor, Handle, Assistant, Acteur};
+/// # use acteur::{Actor, Receive, Assistant, Acteur};
 /// # use async_trait::async_trait;
 /// #
 /// # #[derive(Debug)]
@@ -41,7 +41,7 @@ use std::fmt::Debug;
 /// #     }
 /// # }
 /// # #[async_trait]
-/// # impl Handle<SayByeForever> for Manager {
+/// # impl Receive<SayByeForever> for Manager {
 /// #     async fn handle(&mut self, message: SayByeForever, assistant: &Assistant<Manager>) {}
 /// # }
 /// #[derive(Debug)]
@@ -51,7 +51,7 @@ use std::fmt::Debug;
 /// struct SayByeForever(String);
 ///
 /// #[async_trait]
-/// impl Handle<SalaryChanged> for Employee {
+/// impl Receive<SalaryChanged> for Employee {
 ///     async fn handle(&mut self, message: SalaryChanged, assistant: &Assistant<Employee>) {
 ///         if self.salary > message.0 {
 ///             assistant.send::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
@@ -92,7 +92,7 @@ impl<A: Actor> Assistant<A> {
 
     /// Sends a message to the Actor with the specified Id.
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn send<A2: Actor + Handle<M>, M: Debug + Send + 'static>(
+    pub async fn send<A2: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A2::Id,
         message: M,

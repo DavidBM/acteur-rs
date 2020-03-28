@@ -1,7 +1,7 @@
 use crate::actors_manager::ActorsManager;
 use crate::envelope::{Envelope, Letter};
 use crate::system_director::SystemDirector;
-use crate::{Actor, Assistant, Handle};
+use crate::{Actor, Assistant, Receive};
 use async_std::{
     sync::{channel, Receiver, Sender},
     task,
@@ -48,7 +48,7 @@ impl<A: Actor> ActorProxy<A> {
 
     pub async fn send<M: 'static>(&mut self, message: M)
     where
-        A: Handle<M>,
+        A: Receive<M>,
         M: Send + Debug,
     {
         self.last_sent_message_time = SystemTime::now();

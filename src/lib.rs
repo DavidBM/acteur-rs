@@ -7,7 +7,7 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use acteur::{Actor, Handle, Assistant, Acteur};
+//! use acteur::{Actor, Receive, Assistant, Acteur};
 //! use async_trait::async_trait;
 //!
 //! #[derive(Debug)]
@@ -30,7 +30,7 @@
 //! struct SalaryChanged(u32);
 //!
 //! #[async_trait]
-//! impl Handle<SalaryChanged> for Employee {
+//! impl Receive<SalaryChanged> for Employee {
 //!     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
 //!         self.salary = message.0;
 //!     }
@@ -63,4 +63,4 @@ mod system_director;
 pub use actor::Actor;
 pub use actor_assistant::Assistant;
 pub use facade::Acteur;
-pub use handle::Handle;
+pub use handle::Receive;

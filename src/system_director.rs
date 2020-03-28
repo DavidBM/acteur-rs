@@ -1,7 +1,7 @@
 use crate::actor_proxy::ActorReport;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::ManagerLetter;
-use crate::{Actor, Handle};
+use crate::{Actor, Receive};
 use async_std::sync::{Arc, Sender};
 use dashmap::{mapref::entry::Entry, DashMap};
 use futures::task::AtomicWaker;
@@ -58,7 +58,7 @@ impl SystemDirector {
         }
     }
 
-    pub async fn send<A: Actor + Handle<M>, M: Debug + Send + 'static>(
+    pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
