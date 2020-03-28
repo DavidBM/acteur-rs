@@ -11,7 +11,6 @@ use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[async_trait::async_trait]
@@ -67,8 +66,6 @@ impl<A: Actor> ActorsManager<A> {
         manager
     }
 
-    // TODO: This is wrong. We want to remove the ActorProxy only if the ActorProxy
-    // chooses to. And when it chooses to.
     pub(crate) fn end(&self) {
         self.is_ending.store(true, Ordering::Relaxed);
 
@@ -77,7 +74,7 @@ impl<A: Actor> ActorsManager<A> {
         }
     }
 
-    pub(crate) fn signal_actor_removed(&self) {
+    pub(crate) async fn signal_actor_removed(&self) {
         // Maybe becayse it is not marked to be removed, or because there are still actors or because
         // there are still remaining messages to be sent.
         if !self.is_ready_to_be_removed() {
@@ -94,18 +91,18 @@ impl<A: Actor> ActorsManager<A> {
             return;
         }
 
-        // Remove the entry from the system HashMap
         if let Entry::Occupied(entry) = entry {
+            // Remove the entry from the system HashMap
             entry.remove();
+            // Signaling only when we really remove the manager.
+            self.system_director.signal_manager_removed().await;
         }
-
-        self.system_director.signal_manager_removed();
     }
 
     /// A manager is ready to be removed only if there are no more messages pending to be delivered,
     /// has no active actors and it is flagged to be ended.
     fn is_ready_to_be_removed(&self) -> bool {
-        self.is_ending.load(Ordering::Relaxed) && self.actors.is_empty() && self.sender.is_empty()
+        self.is_ending.load(Ordering::Acquire) && self.actors.is_empty() && self.sender.is_empty()
     }
 
     pub(crate) fn get_sender(&self) -> Sender<ActorManagerProxyCommand<A>> {
@@ -189,7 +186,7 @@ async fn process_dispatch_command<'a, A: Actor>(
 
     command.deliver(&mut actor).await;
 
-    if is_ending.load(Relaxed) {
+    if is_ending.load(Ordering::Relaxed) {
         actor.end();
     }
 

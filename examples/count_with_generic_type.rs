@@ -66,7 +66,7 @@ impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug> Handle<TestMessage> f
             message.field + 1
         );*/
 
-        if message.field > 300 {
+        if message.field > 5_000_000 {
             println!("Time of end: {:?}", SystemTime::now());
             return assistant.stop_system();
         }

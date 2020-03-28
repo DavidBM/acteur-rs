@@ -84,8 +84,11 @@ impl SystemDirector {
         ActorsManager::<A>::new(self.clone())
     }
 
-    pub(crate) fn signal_manager_removed(&self) {
-        if self.is_stopping.load(Relaxed) && self.managers.is_empty() {
+    pub(crate) async fn signal_manager_removed(&self) {
+        let is_stopping = self.is_stopping.load(Relaxed);
+        let is_empty = self.managers.is_empty();
+
+        if is_stopping && is_empty {
             self.waker.wake();
         }
     }
@@ -135,7 +138,7 @@ impl Future for WaitSystemStop {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        if self.0.is_stopping.load(Relaxed) && self.0.managers.is_empty() {
+        if !self.0.is_stopping.load(Relaxed) || !self.0.managers.is_empty() {
             self.0.waker.register(cx.waker());
             Poll::Pending
         } else {

@@ -153,9 +153,10 @@ fn actor_loop<A: Actor>(
                                             // If not messages are found, we just remove the actor from the HashMap
                                             if let Occupied(entry) = entry {
                                                 entry.remove();
+                                                // Signaling only when we really remove the actor.
+                                                manager.signal_actor_removed().await;
                                             }
 
-                                            manager.signal_actor_removed();
                                             // and stop the main loop
                                             break;
                                         }
