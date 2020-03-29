@@ -1,5 +1,7 @@
 use crate::actor_proxy::ActorProxy;
+use crate::handle::Respond;
 use crate::{Actor, Assistant, Receive};
+use async_std::sync::Sender;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -112,5 +114,95 @@ impl<A: Actor + Receive<M>, M: 'static + Send + Debug> ManagerEnvelope for Manag
 
     fn get_actor_id(&self) -> A::Id {
         ManagerLetter::<A, M>::get_actor_id(self)
+    }
+}
+
+//////////////////////////////////////////
+
+/// This struct behaves as the Letter struct but it contains a Sender for the response.
+#[derive(Debug)]
+pub(crate) struct LetterWithResponder<A: Actor + Respond<M>, M: Debug> {
+    message: Option<M>,
+    phantom_actor: PhantomData<A>,
+    phantom_response: PhantomData<<A as Respond<M>>::Response>,
+    responder: Sender<<A as Respond<M>>::Response>,
+}
+
+impl<A: Respond<M> + Actor, M: Debug> LetterWithResponder<A, M> {
+    pub fn new(message: M, responder: Sender<<A as Respond<M>>::Response>) -> Self {
+        LetterWithResponder {
+            message: Some(message),
+            phantom_actor: PhantomData,
+            phantom_response: PhantomData,
+            responder,
+        }
+    }
+
+    pub async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
+        if let Some(message) = self.message.take() {
+            let response = <A as Respond<M>>::handle(actor, message, assistant).await;
+            self.responder.send(response).await;
+        }
+    }
+}
+
+#[async_trait]
+impl<A: Actor + Respond<M>, M: Send + Debug> Envelope for LetterWithResponder<A, M> {
+    type Actor = A;
+
+    async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
+        LetterWithResponder::<A, M>::dispatch(self, actor, assistant).await
+    }
+}
+
+/// Same as ManagerLetter but with a response
+#[derive(Debug)]
+pub(crate) struct ManagerLetterWithResponder<A: Actor + Respond<M>, M: Debug> {
+    message: Option<M>,
+    actor_id: A::Id,
+    phantom_actor: PhantomData<<A as Respond<M>>::Response>,
+    phantom_response: PhantomData<A>,
+    responder: Option<Sender<<A as Respond<M>>::Response>>,
+}
+
+impl<A: Respond<M> + Actor, M: 'static + Send + Debug> ManagerLetterWithResponder<A, M> {
+    pub fn new(actor_id: A::Id, message: M, responder: Sender<<A as Respond<M>>::Response>) -> Self
+    where
+        A: Respond<M>,
+    {
+        ManagerLetterWithResponder {
+            message: Some(message),
+            actor_id,
+            phantom_actor: PhantomData,
+            phantom_response: PhantomData,
+            responder: Some(responder),
+        }
+    }
+
+    pub fn get_actor_id(&self) -> A::Id {
+        self.actor_id.clone()
+    }
+
+    pub async fn deliver(&mut self, manager: &mut ActorProxy<A>) {
+        if let Some(message) = self.message.take() {
+            if let Some(responder) = self.responder.take() {
+                manager.call(message, responder).await;
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl<A: Actor + Respond<M>, M: 'static + Send + Debug> ManagerEnvelope
+    for ManagerLetterWithResponder<A, M>
+{
+    type Actor = A;
+
+    async fn deliver(&mut self, manager: &mut ActorProxy<Self::Actor>) {
+        ManagerLetterWithResponder::<A, M>::deliver(self, manager).await
+    }
+
+    fn get_actor_id(&self) -> A::Id {
+        ManagerLetterWithResponder::<A, M>::get_actor_id(self)
     }
 }

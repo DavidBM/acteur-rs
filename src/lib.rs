@@ -63,4 +63,4 @@ mod system_director;
 pub use actor::Actor;
 pub use actor_assistant::Assistant;
 pub use facade::Acteur;
-pub use handle::Receive;
+pub use handle::{Receive, Respond};

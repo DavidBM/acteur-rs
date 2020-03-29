@@ -1,10 +1,10 @@
 use crate::actors_manager::ActorsManager;
 use crate::system_director::SystemDirector;
-use crate::{Actor, Receive};
+use crate::{Actor, Receive, Respond};
 use async_std::task;
 use std::fmt::Debug;
 
-/// This object is provided to the handle method in the [Receive](./trait.Receive.html) trait for each message 
+/// This object is provided to the handle method in the [Receive](./trait.Receive.html) trait for each message
 /// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no_run
@@ -98,6 +98,16 @@ impl<A: Actor> Assistant<A> {
         message: M,
     ) {
         self.system_director.send::<A2, M>(actor_id, message).await
+    }
+
+    /// Sends a message to the Actor with the specified Id and waits the actor's response .
+    /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
+    pub async fn call<A2: Actor + Respond<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A2::Id,
+        message: M,
+    ) -> Result<<A2 as Respond<M>>::Response, &str> {
+        self.system_director.call::<A2, M>(actor_id, message).await
     }
 
     /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.

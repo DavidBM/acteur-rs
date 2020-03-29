@@ -48,14 +48,16 @@ Regarding the implementation:
 - [ ] Automatic deallocation of unused actors
 - [ ] Subscribe to message
 - [ ] Fan-out messages
-- [ ] RPC like messages between actors
+- [x] RPC like messages between actors
 - [ ] Services (statefull or stateless, like actors, without ID and processing messages concurrently)
 - [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 
 ## Examples
 
+Simple example
+
 ```rust
-use acteur::{Acteur, Actor, Assistant, Handle};
+use acteur::{Acteur, Actor, Assistant, Receive};
 use async_trait::async_trait;
 
 #[derive(Debug)]
@@ -78,7 +80,7 @@ impl Actor for Employee {
 struct SalaryChanged(u32);
 
 #[async_trait]
-impl Handle<SalaryChanged> for Employee {
+impl Receive<SalaryChanged> for Employee {
     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
         self.salary = message.0;
     }
@@ -92,6 +94,8 @@ fn main() {
     sys.wait_until_stopped();
 }
 ```
+
+You can find more examples in [the examples folder](./examples).
 
 ## Safe Rust
 

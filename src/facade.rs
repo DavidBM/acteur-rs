@@ -1,6 +1,6 @@
 use crate::actor_proxy::ActorReport;
 use crate::system_director::SystemDirector;
-use crate::{Actor, Receive};
+use crate::{Actor, Receive, Respond};
 use async_std::task;
 use lazy_static::lazy_static;
 use std::any::TypeId;
@@ -35,6 +35,10 @@ impl Acteur {
     }
 
     /// Sends a message to an actor with an ID.
+    /// 
+    /// This method will execute the [Receive::handle](./trait.Receive.html) implemented for 
+    /// that Message and Actor.
+    /// 
     /// If the actor is not loaded in Ram, this method will load them first
     /// by calling their "activate" method.
     pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
@@ -52,6 +56,31 @@ impl Acteur {
         message: M,
     ) {
         task::block_on(async move { self.send::<A, M>(actor_id, message).await })
+    }
+
+    /// As send method, it sends a message to an actor with an ID but this one
+    /// wait for a response from the actor.
+    /// 
+    /// This method will execute the [Respond::handle](./trait.Respond.html) implemented for 
+    /// that Message and Actor.
+    /// 
+    /// If the actor is not loaded in Ram, this method will load them first
+    /// by calling their "activate" method.
+    pub async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        message: M,
+    ) -> Result<<A as Respond<M>>::Response, &str> {
+        self.system_director.call::<A, M>(actor_id, message).await
+    }
+
+    /// Same as `call` method, but sync version.
+    pub fn call_sync<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        message: M,
+    ) -> Result<<A as Respond<M>>::Response, &str> {
+        task::block_on(async move { self.call::<A, M>(actor_id, message).await })
     }
 
     /// Send an stop message to all actors in the system.

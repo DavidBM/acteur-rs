@@ -1,7 +1,8 @@
 use crate::actor_proxy::ActorReport;
 use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
-use crate::envelope::ManagerLetter;
-use crate::{Actor, Receive};
+use crate::envelope::{ManagerLetter, ManagerLetterWithResponder};
+use crate::{Actor, Receive, Respond};
+use async_std::sync::channel;
 use async_std::sync::{Arc, Sender};
 use dashmap::{mapref::entry::Entry, DashMap};
 use futures::task::AtomicWaker;
@@ -68,6 +69,23 @@ impl SystemDirector {
                 ManagerLetter::new(actor_id, message),
             )))
             .await;
+    }
+
+    // TODO: Create a proper return type without &str
+    pub async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        message: M,
+    ) -> Result<<A as Respond<M>>::Response, &str> {
+        let (sender, receiver) = channel::<<A as Respond<M>>::Response>(1);
+
+        self.get_or_create_manager_sender::<A>()
+            .send(ActorManagerProxyCommand::Dispatch(Box::new(
+                ManagerLetterWithResponder::new(actor_id, message, sender),
+            )))
+            .await;
+
+        receiver.recv().await.ok_or("Ups!")
     }
 
     pub async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {

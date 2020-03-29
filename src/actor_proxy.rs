@@ -1,7 +1,7 @@
 use crate::actors_manager::ActorsManager;
-use crate::envelope::{Envelope, Letter};
+use crate::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::system_director::SystemDirector;
-use crate::{Actor, Assistant, Receive};
+use crate::{Actor, Assistant, Receive, Respond};
 use async_std::{
     sync::{channel, Receiver, Sender},
     task,
@@ -54,6 +54,24 @@ impl<A: Actor> ActorProxy<A> {
         self.last_sent_message_time = SystemTime::now();
 
         let message = Letter::<A, M>::new(message);
+
+        // TODO: Handle the channel disconnection properly
+        self.sender
+            .send(ActorProxyCommand::Dispatch(Box::new(message)))
+            .await;
+    }
+
+    pub async fn call<M: 'static>(
+        &mut self,
+        message: M,
+        responder: Sender<<A as Respond<M>>::Response>,
+    ) where
+        A: Respond<M>,
+        M: Send + Debug,
+    {
+        self.last_sent_message_time = SystemTime::now();
+
+        let message = LetterWithResponder::<A, M>::new(message, responder);
 
         // TODO: Handle the channel disconnection properly
         self.sender

@@ -1,4 +1,4 @@
-use acteur::{Acteur, Actor, Assistant, Handle};
+use acteur::{Acteur, Actor, Assistant, Receive};
 use async_trait::async_trait;
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ impl Actor for Employee {
 struct SalaryChanged(u32);
 
 #[async_trait]
-impl Handle<SalaryChanged> for Employee {
+impl Receive<SalaryChanged> for Employee {
     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
         self.salary = message.0;
     }
