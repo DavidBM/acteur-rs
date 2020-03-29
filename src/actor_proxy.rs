@@ -1,22 +1,24 @@
-use std::future::Future;
-use std::pin::Pin;
 use crate::actors_manager::ActorsManager;
-use crate::envelope::{Envelope, Letter};
 use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Receive};
+use async_std::sync::Arc;
 use async_std::{
     sync::{channel, Receiver, Sender},
     task,
 };
 use dashmap::mapref::entry::Entry::Occupied;
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
 use std::time::SystemTime;
 
-pub(crate) type ActorProxyTask<A> =
-    Box<dyn FnOnce(&mut A, &Assistant<A>) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + 'static>;
+pub(crate) type ActorProxyTask<A> = Box<
+    dyn FnOnce(Arc<A>, Arc<Assistant<A>>) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>
+        + Send
+        + 'static,
+>;
 
 pub(crate) enum ActorProxyCommand<A: Actor> {
-    Dispatch(Box<dyn Envelope<Actor = A>>),
     Exec(ActorProxyTask<A>),
     End,
 }
@@ -57,11 +59,19 @@ impl<A: Actor> ActorProxy<A> {
     {
         self.last_sent_message_time = SystemTime::now();
 
-        let message = Letter::<A, M>::new(message);
-
         // TODO: Handle the channel disconnection properly
         self.sender
-            .send(ActorProxyCommand::Dispatch(Box::new(message)))
+            .send(ActorProxyCommand::Exec(Box::new(
+                move |mut actor, assistant| {
+                    Box::pin(async move {
+                        // TODO: I don't like to use get_mut as it can fail, but I cannot find 
+                        // another way for now. In any case, we guarantee that we are calling
+                        // the actor once at a time
+                        Receive::handle(Arc::get_mut(&mut actor).unwrap(), message, &assistant)
+                            .await;
+                    })
+                },
+            )))
             .await;
     }
 
@@ -96,17 +106,14 @@ fn actor_loop<A: Actor>(
     manager: ActorsManager<A>,
 ) {
     task::spawn(async move {
-        let mut actor = A::activate(id.clone()).await;
-
+        let actor = Arc::new(A::activate(id.clone()).await);
+        let assistant = Arc::new(assistant);
         task::spawn(async move {
             loop {
                 if let Some(command) = receiver.recv().await {
                     match command {
-                        ActorProxyCommand::Dispatch(mut envelope) => {
-                            envelope.dispatch(&mut actor, &assistant).await
-                        }
                         ActorProxyCommand::Exec(handler) => {
-                            handler(&mut actor, &assistant).await
+                            handler(actor.clone(), assistant.clone()).await
                         }
                         // The end process is a bit complicated. We don't want that if a End message
                         // is issued at the same time that someone else is sending a message we process
@@ -148,21 +155,13 @@ fn actor_loop<A: Actor>(
                                     )
                                     .await
                                     {
-                                        Some(ActorProxyCommand::Dispatch(mut envelope)) => {
-                                            // We stop blocking the entry as we will continue receiving messages
-                                            drop(entry);
-                                            // We postpone the ending of the actor
-                                            sender.send(ActorProxyCommand::End).await;
-                                            // and process the found message
-                                            envelope.dispatch(&mut actor, &assistant).await
-                                        }
                                         Some(ActorProxyCommand::Exec(handler)) => {
                                             // We stop blocking the entry as we will continue receiving messages
                                             drop(entry);
                                             // We postpone the ending of the actor
                                             sender.send(ActorProxyCommand::End).await;
                                             // and process the found message
-                                            handler(&mut actor, &assistant).await
+                                            handler(actor.clone(), assistant.clone()).await
                                         }
                                         None | Some(ActorProxyCommand::End) => {
                                             // If not messages are found, we just remove the actor from the HashMap
@@ -177,17 +176,11 @@ fn actor_loop<A: Actor>(
                                         }
                                     }
                                 }
-                                Some(ActorProxyCommand::Dispatch(mut envelope)) => {
-                                    // If there are any message left, we postpone the shutdown.
-                                    sender.send(ActorProxyCommand::End).await;
-                                    // and process the found message
-                                    envelope.dispatch(&mut actor, &assistant).await
-                                }
                                 Some(ActorProxyCommand::Exec(handler)) => {
                                     // If there are any message left, we postpone the shutdown.
                                     sender.send(ActorProxyCommand::End).await;
                                     // and process the found message
-                                    handler(&mut actor, &assistant).await
+                                    handler(actor.clone(), assistant.clone()).await
                                 }
                             }
                         }
@@ -198,12 +191,9 @@ fn actor_loop<A: Actor>(
     });
 }
 
-impl <A: Actor> Debug for ActorProxyCommand<A> {
-
+impl<A: Actor> Debug for ActorProxyCommand<A> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-
         let name = match self {
-            ActorProxyCommand::Dispatch(_) => "Dispatch",
             ActorProxyCommand::Exec(_) => "Exec",
             ActorProxyCommand::End => "End",
         };
