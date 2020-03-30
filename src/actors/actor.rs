@@ -17,7 +17,7 @@ use std::hash::Hash;
 /// // You can use any normal struct as an actor. It will contain the actor state..
 /// #[derive(Debug)]
 /// struct Employee {
-/// 	id: u32,
+///     id: u32,
 ///     salary: u32,
 /// }
 ///
@@ -25,20 +25,19 @@ use std::hash::Hash;
 /// impl Actor for Employee {
 ///     type Id = u32;
 ///
-/// 	// You can use or not the actor Id, still, it will be kept by the framework.
-/// 	// This method allows you to acquire any resource you need and save it.
+///     // You can use or not the actor Id, still, it will be kept by the framework.
+///     // This method allows you to acquire any resource you need and save it.
 ///     async fn activate(id: Self::Id) -> Self {
-/// 		println!("Employee {:?} activated!", id);
+///         println!("Employee {:?} activated!", id);
 ///         Employee {
-/// 			id,
+///             id,
 ///             salary: 0 //Load from DB, set a default, etc
 ///         }
 ///     }
 ///
-/// 	// You can use or not the actor Id, still, it will be kept by the framework.
-/// 	// This method allows you to acquire any resource you need and save it.
+///     // This method allows you to delete resources, close sockets, etc.
 ///     async fn deactivate(&mut self) {
-/// 		println!("Employee {:?} deactivated!", self.id);
+///         println!("Employee {:?} deactivated!", self.id);
 ///     }
 /// }
 /// ```

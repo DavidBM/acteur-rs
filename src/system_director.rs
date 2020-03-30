@@ -18,7 +18,7 @@ use std::{
 // TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
 pub(crate) struct SystemDirector {
-    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>, // DELETE ?
+    managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
     is_stopping: Arc<AtomicBool>,
@@ -26,12 +26,9 @@ pub(crate) struct SystemDirector {
 
 impl SystemDirector {
     pub(crate) fn new() -> SystemDirector {
-        let manager_list = Arc::new(DashMap::new());
-        let waker = Arc::new(AtomicWaker::new());
-
         SystemDirector {
-            managers: manager_list.clone(),
-            waker: waker.clone(),
+            managers: Arc::new(DashMap::new()),
+            waker: Arc::new(AtomicWaker::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
         }
     }

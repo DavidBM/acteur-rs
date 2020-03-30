@@ -1,5 +1,5 @@
 use crate::actors::proxy::{ActorProxy, ActorReport};
-use crate::envelope::ManagerEnvelope;
+use crate::actors::envelope::ManagerEnvelope;
 use crate::system_director::SystemDirector;
 use crate::Actor;
 use async_std::{

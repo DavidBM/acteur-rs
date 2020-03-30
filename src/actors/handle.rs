@@ -147,10 +147,7 @@ where
 ///
 ///
 #[async_trait]
-pub trait Respond<M: Debug>
-where
-    Self: Sized + Actor,
-{
+pub trait Respond<M: Debug>: Sized + Actor {
     type Response: Send;
     /// This method is called each time a message is received. You can use the [Assistant](./struct.Assistant.html) to send messages
     async fn handle(&mut self, message: M, assistant: &Assistant<Self>) -> Self::Response;

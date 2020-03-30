@@ -1,5 +1,5 @@
 use crate::actors::proxy::ActorProxy;
-use crate::handle::Respond;
+use crate::actors::handle::Respond;
 use crate::{Actor, Assistant, Receive};
 use async_std::sync::Sender;
 use async_trait::async_trait;

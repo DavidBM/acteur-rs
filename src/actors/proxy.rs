@@ -1,5 +1,5 @@
 use crate::actors::manager::ActorsManager;
-use crate::envelope::{Envelope, Letter, LetterWithResponder};
+use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Receive, Respond};
 use async_std::{
