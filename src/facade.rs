@@ -1,4 +1,4 @@
-use crate::actor_proxy::ActorReport;
+use crate::actors::proxy::ActorReport;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
 use async_std::task;

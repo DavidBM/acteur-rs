@@ -1,5 +1,5 @@
-use crate::actor_proxy::ActorReport;
-use crate::actors_manager::{ActorManagerProxyCommand, ActorsManager, Manager};
+use crate::actors::proxy::ActorReport;
+use crate::actors::manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::envelope::{ManagerLetter, ManagerLetterWithResponder};
 use crate::{Actor, Receive, Respond};
 use async_std::sync::channel;

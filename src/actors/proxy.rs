@@ -1,4 +1,4 @@
-use crate::actors_manager::ActorsManager;
+use crate::actors::manager::ActorsManager;
 use crate::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::system_director::SystemDirector;
 use crate::{Actor, Assistant, Receive, Respond};

@@ -51,16 +51,13 @@
 
 #[macro_use]
 mod utils;
-mod actor;
-mod actor_assistant;
-mod actor_proxy;
-mod actors_manager;
+mod actors;
 mod envelope;
 mod facade;
 mod handle;
 mod system_director;
 
-pub use actor::Actor;
-pub use actor_assistant::Assistant;
+pub use actors::actor::Actor;
+pub use actors::assistant::Assistant;
 pub use facade::Acteur;
 pub use handle::{Receive, Respond};

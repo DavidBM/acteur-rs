@@ -1,4 +1,4 @@
-use crate::actors_manager::ActorsManager;
+use crate::actors::manager::ActorsManager;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
 use async_std::task;

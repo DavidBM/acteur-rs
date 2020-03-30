@@ -1,4 +1,4 @@
-use crate::actor_proxy::{ActorProxy, ActorReport};
+use crate::actors::proxy::{ActorProxy, ActorReport};
 use crate::envelope::ManagerEnvelope;
 use crate::system_director::SystemDirector;
 use crate::Actor;

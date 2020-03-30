@@ -1,4 +1,4 @@
-use crate::actor_proxy::ActorProxy;
+use crate::actors::proxy::ActorProxy;
 use crate::handle::Respond;
 use crate::{Actor, Assistant, Receive};
 use async_std::sync::Sender;
