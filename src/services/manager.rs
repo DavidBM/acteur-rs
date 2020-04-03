@@ -1,5 +1,4 @@
 use crate::services::envelope::ServiceEnvelope;
-use crate::services::handle::Notify;
 use crate::services::service::{Service, ServiceConcurrency};
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
@@ -10,12 +9,11 @@ use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 
-#[async_trait::async_trait]
-pub(crate) trait Manager: Send + Sync + Debug {
+pub(crate) trait Manager {
     fn end(&self);
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ServiceManagerReport;
-    fn get_sender_as_any(&self) -> Box<dyn Any>;
+    fn get_sender_as_any(&mut self) -> Box<dyn Any>;
 }
 
 pub(crate) type ServiceManagerReport = Vec<u32>;
@@ -61,13 +59,7 @@ impl<S: Service> ServiceManager<S> {
         }
     }
 
-    async fn get_sender<M: Debug + Send + 'static>(
-        &mut self,
-        message: M,
-    ) -> Sender<ServiceManagerCommand<S>>
-    where
-        S: Service + Notify<M>,
-    {
+    fn get_sender(&mut self) -> Sender<ServiceManagerCommand<S>> {
         let current = {
             let current = self.current.get_mut();
 
@@ -94,8 +86,8 @@ fn service_loop<S: Service>(receiver: Receiver<ServiceManagerCommand<S>>, _servi
 }
 
 impl<S: Service> Manager for ServiceManager<S> {
-    fn get_sender_as_any(&self) -> Box<(dyn Any + 'static)> {
-        unimplemented!()
+    fn get_sender_as_any(&mut self) -> Box<(dyn Any + 'static)> {
+        Box::new(self.get_sender())
     }
     fn get_statistics(&self) -> Vec<u32> {
         unimplemented!()
