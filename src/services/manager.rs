@@ -1,15 +1,31 @@
+use std::any::TypeId;
+use std::any::Any;
 use std::fmt::Debug;
 use crate::services::handle::Notify;
-use crate::actors::envelope::Letter;
 use crate::services::envelope::ServiceEnvelope;
 use std::sync::atomic::{AtomicUsize};
 use async_std::{sync::{Arc, channel, Sender, Receiver}, task};
 use crate::services::service::{Service, ServiceConcurrency};
 
+#[async_trait::async_trait]
+pub(crate) trait Manager: Send + Sync + Debug {
+    fn end(&self);
+    fn get_type_id(&self) -> TypeId;
+    fn get_statistics(&self) -> ServiceManagerReport;
+    fn get_sender_as_any(&self) -> Box<dyn Any>;
+}
+
+pub(crate) type ServiceManagerReport = Vec<u32>;
+
+#[derive(Debug)]
+pub(crate) enum ServiceManagerCommand<S: Service> {
+    Dispatch(Box<dyn ServiceEnvelope<Service = S>>),
+    End,
+}
 
 #[derive(Debug)]
 struct ServiceManager<S: Service> {
-    senders: Vec<Sender<Box<dyn ServiceEnvelope<Service = S>>>>,
+    senders: Vec<Sender<ServiceManagerCommand<S>>>,
     current: AtomicUsize,
 }
 
@@ -30,7 +46,7 @@ impl <S: Service> ServiceManager<S> {
         let mut senders = Vec::new();
 
         for _ in 0..concurrency {
-            let (sender, receiver) = channel::<Box<dyn ServiceEnvelope<Service = S>>>(150_000);
+            let (sender, receiver) = channel::<ServiceManagerCommand<S>>(150_000);
             senders.push(sender);
 
             service_loop(receiver, service.clone());
@@ -42,7 +58,7 @@ impl <S: Service> ServiceManager<S> {
         }
     }
 
-    async fn send<M: Debug + Send + 'static>(&mut self, message: M)
+    async fn get_sender<M: Debug + Send + 'static>(&mut self, message: M) -> Sender<ServiceManagerCommand<S>>
     where S: Service + Notify<M>{
         let current = {
             let current = self.current.get_mut();
@@ -58,20 +74,23 @@ impl <S: Service> ServiceManager<S> {
             current.clone()
         };
 
-        let sender = match self.senders.get(current) {
-            Some(sender) => sender,
+        match self.senders.get(current) {
+            Some(sender) => sender.clone(),
             _ => unreachable!(),
-        };
-
-        let message = Letter::<S, M>::new_for_service(message);
-
-        sender.send(Box::new(message)).await;
+        }
     }
 }
 
-fn service_loop<S: Service>(receiver: Receiver<Box<dyn ServiceEnvelope<Service = S>>>, _service: Arc<S>) {
+fn service_loop<S: Service>(receiver: Receiver<ServiceManagerCommand<S>>, _service: Arc<S>) {
     task::spawn(async move {
         while let Some(_message) = receiver.recv().await {
         }
     });
+}
+
+impl <S: Service> Manager for ServiceManager<S> { 
+    fn get_sender_as_any(&self) -> Box<(dyn Any + 'static)> { unimplemented!() }
+    fn get_statistics(&self) -> Vec<u32> { unimplemented!() }
+    fn get_type_id(&self) -> TypeId { unimplemented!() }
+    fn end(&self) { unimplemented!() }
 }
