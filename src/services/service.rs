@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 /// 
 /// Services are id-less actors that can process messages with certain concurrency.
 /// The concurrency level can be configured during the "initialize" method with the
@@ -29,7 +31,7 @@
 /// impl Serve<EmployeeSalaryChange> for EmployeeTaxesCalculator {
 ///     type Response: f32;
 /// 
-///     async fn handle(&self, message: EmployeeSalaryChange, assistant: &ServiceAssistant) -> f32 {
+///     async fn handle(&self, message: EmployeeSalaryChange, assistant: &System) -> f32 {
 ///         self.tax_rate * message.0;
 ///     }
 /// }
@@ -37,7 +39,6 @@
 /// fn main() {
 ///     let sys = System::new();
 /// 
-///     sys.send_service_sync::<EmployeeTaxesCalculator, _>(EmployeeSalaryChange(55000));
 ///     sys.call_service_sync::<EmployeeTaxesCalculator, _>(EmployeeSalaryChange(55000));
 /// 
 ///     sys.stop();
@@ -47,7 +48,7 @@
 /// ```
 /// 
 #[async_trait::async_trait]
-pub trait Service: Send + Sync {
+pub trait Service: Sized + Send + Sync + Debug + 'static {
     async fn initialize() -> (Self, ServiceConfiguration);
 }
 

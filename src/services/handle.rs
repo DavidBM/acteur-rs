@@ -9,7 +9,7 @@ pub trait Notify<M: Debug>
 where
     Self: Sized + Service,
 {
-    async fn handle(&mut self, message: M);
+    async fn handle(&self, message: M);
 }
 
 
@@ -18,5 +18,5 @@ where
 pub trait Serve<M: Debug>: Sized + Actor {
     type Response: Send;
 
-    async fn handle(&mut self, message: M) -> Self::Response;
+    async fn handle(&self, message: M) -> Self::Response;
 }

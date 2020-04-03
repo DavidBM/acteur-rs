@@ -1,5 +1,5 @@
 use crate::actors::manager::ActorsManager;
-use crate::system_director::SystemDirector;
+use crate::actors::director::ActorsDirector;
 use crate::{Actor, Receive, Respond};
 use async_std::task;
 use std::fmt::Debug;
@@ -72,19 +72,19 @@ use std::fmt::Debug;
 /// ```
 ///
 pub struct Assistant<A: Actor> {
-    system_director: SystemDirector,
+    actors_director: ActorsDirector,
     actor_id: A::Id,
     manager: ActorsManager<A>,
 }
 
 impl<A: Actor> Assistant<A> {
     pub(crate) fn new(
-        system_director: SystemDirector,
+        actors_director: ActorsDirector,
         manager: ActorsManager<A>,
         actor_id: A::Id,
     ) -> Assistant<A> {
         Assistant {
-            system_director,
+            actors_director,
             actor_id,
             manager,
         }
@@ -97,7 +97,7 @@ impl<A: Actor> Assistant<A> {
         actor_id: A2::Id,
         message: M,
     ) {
-        self.system_director.send::<A2, M>(actor_id, message).await
+        self.actors_director.send::<A2, M>(actor_id, message).await
     }
 
     /// Sends a message to the Actor with the specified Id and waits the actor's response .
@@ -107,13 +107,13 @@ impl<A: Actor> Assistant<A> {
         actor_id: A2::Id,
         message: M,
     ) -> Result<<A2 as Respond<M>>::Response, &str> {
-        self.system_director.call::<A2, M>(actor_id, message).await
+        self.actors_director.call::<A2, M>(actor_id, message).await
     }
 
     /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.
     /// Keep in mind that event is an actor is stopped, a new message in the future can wake up the actor.
     pub async fn stop(&self) {
-        self.system_director
+        self.actors_director
             .stop_actor::<A>(self.actor_id.clone())
             .await;
     }
@@ -121,7 +121,7 @@ impl<A: Actor> Assistant<A> {
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub fn stop_system(&self) {
-        let system = self.system_director.clone();
+        let system = self.actors_director.clone();
 
         task::spawn(async move {
             system.stop().await;
@@ -132,7 +132,7 @@ impl<A: Actor> Assistant<A> {
 impl<A: Actor> Clone for Assistant<A> {
     fn clone(&self) -> Self {
         Assistant {
-            system_director: self.system_director.clone(),
+            actors_director: self.actors_director.clone(),
             actor_id: self.actor_id.clone(),
             manager: self.manager.clone(),
         }

@@ -9,7 +9,7 @@ use std::fmt::Debug;
 // We do this in order to keep all the actors in the same system. If not, two calls
 // to "new" can create duplicated actors.
 lazy_static! {
-    static ref ADDRESS_BOOK: SystemDirector = SystemDirector::new();
+    static ref SYSTEM_DIRECTOR: SystemDirector = SystemDirector::new();
 }
 
 /// Acteur is the main inteface to the actor runtime.
@@ -30,7 +30,7 @@ impl Acteur {
     /// Initializes the system. After this, you can send messages using the send method.
     pub fn new() -> Acteur {
         Acteur {
-            system_director: ADDRESS_BOOK.clone(),
+            system_director: SYSTEM_DIRECTOR.clone(),
         }
     }
 
@@ -46,7 +46,7 @@ impl Acteur {
         actor_id: A::Id,
         message: M,
     ) {
-        self.system_director.send::<A, M>(actor_id, message).await;
+        self.system_director.send_to_actor::<A, M>(actor_id, message).await;
     }
 
     /// Same as `send` method, but sync version.
@@ -71,7 +71,7 @@ impl Acteur {
         actor_id: A::Id,
         message: M,
     ) -> Result<<A as Respond<M>>::Response, &str> {
-        self.system_director.call::<A, M>(actor_id, message).await
+        self.system_director.call_to_actor::<A, M>(actor_id, message).await
     }
 
     /// Same as `call` method, but sync version.

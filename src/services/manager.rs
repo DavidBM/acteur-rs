@@ -1,12 +1,15 @@
+use std::fmt::Debug;
 use crate::services::handle::Notify;
+use crate::actors::envelope::Letter;
 use crate::services::envelope::ServiceEnvelope;
 use std::sync::atomic::{AtomicUsize};
 use async_std::{sync::{Arc, channel, Sender, Receiver}, task};
 use crate::services::service::{Service, ServiceConcurrency};
 
+
 #[derive(Debug)]
 struct ServiceManager<S: Service> {
-    senders: Vec<Sender<dyn ServiceEnvelope>>,
+    senders: Vec<Sender<Box<dyn ServiceEnvelope<Service = S>>>>,
     current: AtomicUsize,
 }
 
@@ -24,11 +27,10 @@ impl <S: Service> ServiceManager<S> {
             ServiceConcurrency::Fixed(quantity) => quantity,
         };
 
-
         let mut senders = Vec::new();
 
-        for _ in concurrency {
-            let (sender, receiver) = channel::<dyn ServiceEnvelope>(150_000);
+        for _ in 0..concurrency {
+            let (sender, receiver) = channel::<Box<dyn ServiceEnvelope<Service = S>>>(150_000);
             senders.push(sender);
 
             service_loop(receiver, service.clone());
@@ -40,17 +42,19 @@ impl <S: Service> ServiceManager<S> {
         }
     }
 
-    async fn send<M>(&self, message: M)
-    where S: Notify<M> {
+    async fn send<M: Debug + Send + 'static>(&mut self, message: M)
+    where S: Service + Notify<M>{
         let current = {
             let current = self.current.get_mut();
             
-            *current = current + 1;
+            *current += 1;
 
-            if current >= self.senders.len() {
+            if current >= &mut self.senders.len() {
                 *current = 0;
             }
 
+            // I think it is cleaner is clone is called specifically.
+            #[allow(clippy::clone_on_copy)]
             current.clone()
         };
 
@@ -59,16 +63,15 @@ impl <S: Service> ServiceManager<S> {
             _ => unreachable!(),
         };
 
-        sender.send().await
+        let message = Letter::<S, M>::new_for_service(message);
+
+        sender.send(Box::new(message)).await;
     }
 }
 
-fn service_loop<S>(receiver: Receiver<dyn ServiceEnvelope>, service: Arc<ServiceManager<S>>) {
+fn service_loop<S: Service>(receiver: Receiver<Box<dyn ServiceEnvelope<Service = S>>>, _service: Arc<S>) {
     task::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            match message {
-
-            }
+        while let Some(_message) = receiver.recv().await {
         }
     });
 }

@@ -30,9 +30,9 @@ pub(crate) trait Envelope: Send + Debug {
 /// required as we are sending the message through a channel that contain Boxed Envelope Traits
 /// which cannot contain the M type as they are generic for all messages.
 #[derive(Debug)]
-pub(crate) struct Letter<A: Actor, M: Debug> {
-    message: Option<M>,
-    phantom: PhantomData<A>,
+pub(crate) struct Letter<A, M: Debug> {
+    pub(crate) message: Option<M>,
+    pub(crate) phantom: PhantomData<A>,
 }
 
 impl<A: Receive<M> + Actor, M: Debug> Letter<A, M> {
@@ -121,7 +121,7 @@ impl<A: Actor + Receive<M>, M: 'static + Send + Debug> ManagerEnvelope for Manag
 
 /// This struct behaves as the Letter struct but it contains a Sender for the response.
 #[derive(Debug)]
-pub(crate) struct LetterWithResponder<A: Actor + Respond<M>, M: Debug> {
+pub(crate) struct LetterWithResponder<A: Respond<M>, M: Debug> {
     message: Option<M>,
     phantom_actor: PhantomData<A>,
     phantom_response: PhantomData<<A as Respond<M>>::Response>,
@@ -206,3 +206,4 @@ impl<A: Actor + Respond<M>, M: 'static + Send + Debug> ManagerEnvelope
         ManagerLetterWithResponder::<A, M>::get_actor_id(self)
     }
 }
+
