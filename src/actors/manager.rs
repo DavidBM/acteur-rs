@@ -1,6 +1,6 @@
-use crate::actors::proxy::{ActorProxy, ActorReport};
-use crate::actors::envelope::ManagerEnvelope;
 use crate::actors::director::ActorsDirector;
+use crate::actors::envelope::ManagerEnvelope;
+use crate::actors::proxy::{ActorProxy, ActorReport};
 use crate::Actor;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},

@@ -3,7 +3,6 @@ use crate::Actor;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-
 #[async_trait]
 pub trait Notify<M: Debug>
 where
@@ -11,8 +10,6 @@ where
 {
     async fn handle(&self, message: M);
 }
-
-
 
 #[async_trait]
 pub trait Serve<M: Debug>: Sized + Actor {

@@ -1,5 +1,5 @@
+use acteur::{Acteur, Actor, Assistant, Receive, Respond};
 use async_trait::async_trait;
-use acteur::{Assistant, Respond, Receive, Acteur, Actor};
 
 #[derive(Debug)]
 struct Employee {
@@ -15,7 +15,7 @@ impl Actor for Employee {
         println!("Employee {:?} activated!", id);
         Employee {
             id,
-            salary: 0 //Load from DB, set a default, etc
+            salary: 0, //Load from DB, set a default, etc
         }
     }
 
@@ -24,20 +24,20 @@ impl Actor for Employee {
     }
 }
 
-
 #[derive(Debug)]
 struct SalaryChanged(u32);
 
 #[async_trait]
 impl Respond<SalaryChanged> for Employee {
-
     type Response = String;
 
     async fn handle(&mut self, message: SalaryChanged, assistant: &Assistant<Employee>) -> String {
-        // This doesn't make much sense as you can just `self.salary = message.0;` here, 
+        // This doesn't make much sense as you can just `self.salary = message.0;` here,
         // but we want to show how you can implement Receive and Response trait for the
         // same message.
-        assistant.send::<Employee, SalaryChanged>(self.id, message).await;
+        assistant
+            .send::<Employee, SalaryChanged>(self.id, message)
+            .await;
 
         String::from("Thanks!")
     }

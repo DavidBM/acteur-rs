@@ -1,14 +1,14 @@
 // Setting the Actor::Id as "()" we make impossible to have serveral instances of this actor.
-// 
-// This will result on a normal actor with only one instance. There are several things to 
+//
+// This will result on a normal actor with only one instance. There are several things to
 // consider in this case:
-// 
-// The actor won't process messages concurrently. As a normal actor instance, it will 
-// process the messages one by one. I have planned to implement something like "Services" 
-// that will spawn several instances of the "service" actor and will round robin the 
+//
+// The actor won't process messages concurrently. As a normal actor instance, it will
+// process the messages one by one. I have planned to implement something like "Services"
+// that will spawn several instances of the "service" actor and will round robin the
 // messages between them.
 //
-// Until then, this is how to do a id-less Actor. 
+// Until then, this is how to do a id-less Actor.
 
 use acteur::{Acteur, Actor, Assistant, Receive};
 use async_trait::async_trait;

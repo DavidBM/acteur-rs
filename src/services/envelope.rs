@@ -1,10 +1,10 @@
 use crate::actors::envelope::Letter;
 use crate::services::handle::Notify;
-use async_std::sync::Sender;
 use crate::services::handle::Serve;
-use std::marker::PhantomData;
-use std::fmt::Debug;
 use crate::services::service::Service;
+use async_std::sync::Sender;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
 /// Trait representing an envelope for a service
 #[async_trait::async_trait]
@@ -15,7 +15,7 @@ pub(crate) trait ServiceEnvelope: Send + Debug {
 }
 
 /// For send without response we can use the normal Letter struct
-impl <S: Service + Notify<M>, M: Debug>Letter<S, M> {
+impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
     pub fn new_for_service(message: M) -> Self
     where
         S: Notify<M>,
@@ -36,7 +36,7 @@ impl <S: Service + Notify<M>, M: Debug>Letter<S, M> {
 
 /// For send without response we can use the normal Letter struct
 #[async_trait::async_trait]
-impl <S: Service + Notify<M>, M: Debug + Send>ServiceEnvelope for Letter<S, M> {
+impl<S: Service + Notify<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
     type Service = S;
 
     async fn dispatch(&mut self, service: &Self::Service) {
@@ -53,7 +53,7 @@ pub(crate) struct ServiceLetterWithResponders<S: Service + Serve<M>, M: Debug> {
 }
 
 /// For messages with a response we need to use a different structure than LetterWithResponder
-impl <S: Service + Serve<M>, M: Debug>ServiceLetterWithResponders<S, M> {
+impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
     fn new(message: M, responder: Sender<<S as Serve<M>>::Response>) -> Self
     where
         S: Serve<M>,
@@ -77,7 +77,7 @@ impl <S: Service + Serve<M>, M: Debug>ServiceLetterWithResponders<S, M> {
 
 /// For messages with a response we need to use a different structure than LetterWithResponder
 #[async_trait::async_trait]
-impl <S: Service + Serve<M>, M: Debug + Send>ServiceEnvelope for ServiceLetterWithResponders<S, M> {
+impl<S: Service + Serve<M>, M: Debug + Send> ServiceEnvelope for ServiceLetterWithResponders<S, M> {
     type Service = S;
 
     async fn dispatch(&mut self, service: &Self::Service) {

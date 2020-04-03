@@ -1,12 +1,10 @@
-use std::any::TypeId;
-use crate::actors::proxy::ActorReport;
 use crate::actors::actor::Actor;
+use crate::actors::director::ActorsDirector;
 use crate::actors::handle::Receive;
 use crate::actors::handle::Respond;
-use crate::actors::director::ActorsDirector;
-use std::{
-    fmt::Debug,
-};
+use crate::actors::proxy::ActorReport;
+use std::any::TypeId;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub(crate) struct SystemDirector {

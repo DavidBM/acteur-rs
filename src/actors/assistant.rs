@@ -1,5 +1,5 @@
-use crate::actors::manager::ActorsManager;
 use crate::actors::director::ActorsDirector;
+use crate::actors::manager::ActorsManager;
 use crate::{Actor, Receive, Respond};
 use async_std::task;
 use std::fmt::Debug;

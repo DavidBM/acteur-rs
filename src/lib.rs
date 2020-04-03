@@ -52,11 +52,11 @@
 #[macro_use]
 mod utils;
 mod actors;
-pub mod services;
 mod facade;
+pub mod services;
 mod system_director;
 
 pub use actors::actor::Actor;
 pub use actors::assistant::Assistant;
-pub use facade::Acteur;
 pub use actors::handle::{Receive, Respond};
+pub use facade::Acteur;

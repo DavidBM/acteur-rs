@@ -1,5 +1,5 @@
-use crate::actors::proxy::ActorProxy;
 use crate::actors::handle::Respond;
+use crate::actors::proxy::ActorProxy;
 use crate::{Actor, Assistant, Receive};
 use async_std::sync::Sender;
 use async_trait::async_trait;
@@ -206,4 +206,3 @@ impl<A: Actor + Respond<M>, M: 'static + Send + Debug> ManagerEnvelope
         ManagerLetterWithResponder::<A, M>::get_actor_id(self)
     }
 }
-

@@ -1,6 +1,6 @@
-use crate::actors::manager::ActorsManager;
-use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::actors::director::ActorsDirector;
+use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
+use crate::actors::manager::ActorsManager;
 use crate::{Actor, Assistant, Receive, Respond};
 use async_std::{
     sync::{channel, Receiver, Sender},
