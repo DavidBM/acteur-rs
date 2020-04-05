@@ -49,7 +49,7 @@ Regarding the implementation:
 - [ ] Subscribe to message
 - [ ] Fan-out messages
 - [x] RPC like messages between actors
-- [ ] Services (statefull or stateless, like actors, without ID and processing messages concurrently)
+- [x] Services (statefull or stateless, like actors, without ID and processing messages concurrently)
 - [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 
 ## Examples

@@ -1,4 +1,3 @@
-use async_std::sync::Arc;
 use crate::actors::actor::Actor;
 use crate::actors::director::ActorsDirector;
 use crate::actors::handle::Receive;
@@ -8,6 +7,7 @@ use crate::services::director::ServicesDirector;
 use crate::services::handle::Notify;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
+use async_std::sync::Arc;
 use futures::join;
 use std::any::TypeId;
 use std::fmt::Debug;

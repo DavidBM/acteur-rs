@@ -1,7 +1,8 @@
-use crate::system_director::SystemDirector;
 use crate::services::director::ServicesDirector;
 use crate::services::envelope::ServiceEnvelope;
 use crate::services::service::{Service, ServiceConcurrency};
+use crate::services::system_facade::System;
+use crate::system_director::SystemDirector;
 use async_std::sync::Mutex;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
@@ -40,11 +41,13 @@ pub(crate) struct ServiceManager<S: Service> {
     current: Arc<Mutex<usize>>,
     is_ending: Arc<AtomicBool>,
     active_services: Arc<AtomicUsize>,
-    system_director: Arc<SystemDirector>,
 }
 
 impl<S: Service> ServiceManager<S> {
-    pub async fn new(director: ServicesDirector, system_director: SystemDirector) -> ServiceManager<S> {
+    pub async fn new(
+        director: ServicesDirector,
+        system_director: SystemDirector,
+    ) -> ServiceManager<S> {
         let (service, service_conf) = S::initialize().await;
 
         let service = Arc::new(service);
@@ -75,7 +78,6 @@ impl<S: Service> ServiceManager<S> {
             current: current.clone(),
             is_ending: Arc::new(AtomicBool::new(false)),
             active_services: active_services.clone(),
-            system_director: Arc::new(system_director),
         };
 
         for receiver in receivers {
@@ -85,6 +87,7 @@ impl<S: Service> ServiceManager<S> {
                 manager.clone(),
                 director.clone(),
                 active_services.clone(),
+                system_director.clone(),
             );
         }
 
@@ -126,14 +129,17 @@ fn service_loop<S: Service>(
     manager: ServiceManager<S>,
     director: ServicesDirector,
     active_services: Arc<AtomicUsize>,
+    system_director: SystemDirector,
 ) {
     task::spawn(async move {
         task::spawn(async move {
+            let system_facade = System::new(system_director);
+
             loop {
                 if let Some(command) = receiver.recv().await {
                     match command {
                         ServiceManagerCommand::Dispatch(mut envelope) => {
-                            envelope.dispatch(&service).await
+                            envelope.dispatch(&service, &system_facade).await
                         }
                         // This algorithm is basically the same as the one in the Actor's Proxy. Check that file
                         // for an explanation in detail.
@@ -166,7 +172,7 @@ fn service_loop<S: Service>(
                                                 .await
                                                 .send(ServiceManagerCommand::End)
                                                 .await;
-                                            envelope.dispatch(&service).await
+                                            envelope.dispatch(&service, &system_facade).await
                                         }
                                         // If there aren't new messages, we finish the loop.
                                         None | Some(ServiceManagerCommand::End) => {
@@ -194,7 +200,7 @@ fn service_loop<S: Service>(
                                         .await
                                         .send(ServiceManagerCommand::End)
                                         .await;
-                                    envelope.dispatch(&service).await
+                                    envelope.dispatch(&service, &system_facade).await
                                 }
                             }
                         }
@@ -233,7 +239,6 @@ impl<S: Service> Clone for ServiceManager<S> {
             current: self.current.clone(),
             is_ending: self.is_ending.clone(),
             active_services: self.active_services.clone(),
-            system_director: self.system_director.clone(),
         }
     }
 }

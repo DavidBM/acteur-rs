@@ -1,7 +1,7 @@
-use crate::system_director::SystemDirector;
 use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::ManagerEnvelope;
 use crate::actors::proxy::{ActorProxy, ActorReport};
+use crate::system_director::SystemDirector;
 use crate::Actor;
 use async_std::{
     sync::{channel, Arc, Receiver, Sender},
@@ -41,7 +41,10 @@ pub(crate) struct ActorsManager<A: Actor> {
 }
 
 impl<A: Actor> ActorsManager<A> {
-    pub fn new(actors_director: ActorsDirector, system_director: SystemDirector) -> ActorsManager<A> {
+    pub fn new(
+        actors_director: ActorsDirector,
+        system_director: SystemDirector,
+    ) -> ActorsManager<A> {
         // Channel in order to receive commands (like sending messages to actors, stopping, etc)
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
 
@@ -151,8 +154,15 @@ async fn actor_manager_loop<'a, A: Actor>(
     while let Some(command) = receiver.recv().await {
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
-                process_dispatch_command(command, &actors, &actors_director, &manager, &is_ending, &system_director)
-                    .await;
+                process_dispatch_command(
+                    command,
+                    &actors,
+                    &actors_director,
+                    &manager,
+                    &is_ending,
+                    &system_director,
+                )
+                .await;
             }
             ActorManagerProxyCommand::EndActor(actor_id) => {
                 process_end_actor_command(actor_id, &actors).await;
@@ -185,8 +195,12 @@ async fn process_dispatch_command<'a, A: Actor>(
         return;
     }
 
-    let mut actor =
-        ActorProxy::<A>::new(system_director.clone(), actors_director.clone(), manager.clone(), actor_id.clone());
+    let mut actor = ActorProxy::<A>::new(
+        system_director.clone(),
+        actors_director.clone(),
+        manager.clone(),
+        actor_id.clone(),
+    );
 
     command.deliver(&mut actor).await;
 

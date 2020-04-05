@@ -1,9 +1,9 @@
-use crate::system_director::SystemDirector;
 use crate::actors::envelope::Letter;
 use crate::services::envelope::ServiceLetterWithResponders;
 use crate::services::handle::Notify;
 use crate::services::handle::Serve;
 use crate::services::manager::{Manager, ServiceManager, ServiceManagerCommand};
+use crate::system_director::SystemDirector;
 use crate::Service;
 use async_std::sync::channel;
 use async_std::sync::{Arc, Sender};

@@ -1,4 +1,3 @@
-use crate::actors::director::ActorsDirector;
 use crate::services::handle::{Notify, Serve};
 use crate::services::service::Service;
 use crate::system_director::SystemDirector;
@@ -10,7 +9,7 @@ use std::fmt::Debug;
 /// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no_run
-/// # use acteur::{Actor, Receive, Assistant, Acteur};
+/// # use acteur::{Actor, Receive, System, Acteur};
 /// # use async_trait::async_trait;
 /// #
 /// # #[derive(Debug)]
@@ -44,7 +43,7 @@ use std::fmt::Debug;
 /// # }
 /// # #[async_trait]
 /// # impl Receive<SayByeForever> for Manager {
-/// #     async fn handle(&mut self, message: SayByeForever, assistant: &Assistant<Manager>) {}
+/// #     async fn handle(&mut self, message: SayByeForever, assistant: &System<Manager>) {}
 /// # }
 /// #[derive(Debug)]
 /// struct SalaryChanged(u32);
@@ -54,7 +53,7 @@ use std::fmt::Debug;
 ///
 /// #[async_trait]
 /// impl Receive<SalaryChanged> for Employee {
-///     async fn handle(&mut self, message: SalaryChanged, assistant: &Assistant<Employee>) {
+///     async fn handle(&mut self, message: SalaryChanged, assistant: &System<Employee>) {
 ///         if self.salary > message.0 {
 ///             assistant.send::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
 ///         }
@@ -73,43 +72,37 @@ use std::fmt::Debug;
 ///
 /// ```
 ///
-pub struct Assistant<A: Actor> {
+pub struct System {
     system_director: SystemDirector,
-    actors_director: ActorsDirector,
-    actor_id: A::Id,
 }
 
-impl<A: Actor> Assistant<A> {
-    pub(crate) fn new(
-        system_director: SystemDirector,
-        actors_director: ActorsDirector,
-        actor_id: A::Id,
-    ) -> Assistant<A> {
-        Assistant {
-            system_director,
-            actors_director,
-            actor_id,
-        }
+impl System {
+    pub(crate) fn new(system_director: SystemDirector) -> System {
+        System { system_director }
     }
 
     /// Sends a message to the Actor with the specified Id.
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn send<A2: Actor + Receive<M>, M: Debug + Send + 'static>(
+    pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
-        actor_id: A2::Id,
+        actor_id: A::Id,
         message: M,
     ) {
-        self.actors_director.send::<A2, M>(actor_id, message).await
+        self.system_director
+            .send_to_actor::<A, M>(actor_id, message)
+            .await
     }
 
     /// Sends a message to the Actor with the specified Id and waits the actor's response .
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn call<A2: Actor + Respond<M>, M: Debug + Send + 'static>(
+    pub async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
-        actor_id: A2::Id,
+        actor_id: A::Id,
         message: M,
-    ) -> Result<<A2 as Respond<M>>::Response, &str> {
-        self.actors_director.call::<A2, M>(actor_id, message).await
+    ) -> Result<<A as Respond<M>>::Response, &str> {
+        self.system_director
+            .call_to_actor::<A, M>(actor_id, message)
+            .await
     }
 
     /// Sends a message to a Service.
@@ -127,14 +120,6 @@ impl<A: Actor> Assistant<A> {
         self.system_director.call_to_service::<S, M>(message).await
     }
 
-    /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.
-    /// Keep in mind that event is an actor is stopped, a new message in the future can wake up the actor.
-    pub async fn stop(&self) {
-        self.actors_director
-            .stop_actor::<A>(self.actor_id.clone())
-            .await;
-    }
-
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub fn stop_system(&self) {
@@ -146,18 +131,16 @@ impl<A: Actor> Assistant<A> {
     }
 }
 
-impl<A: Actor> Clone for Assistant<A> {
+impl Clone for System {
     fn clone(&self) -> Self {
-        Assistant {
-            actors_director: self.actors_director.clone(),
-            actor_id: self.actor_id.clone(),
+        System {
             system_director: self.system_director.clone(),
         }
     }
 }
 
-impl<A: Actor> Debug for Assistant<A> {
+impl Debug for System {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ActorSecretary for {}", std::any::type_name::<A>())
+        write!(f, "System Facade for Service")
     }
 }

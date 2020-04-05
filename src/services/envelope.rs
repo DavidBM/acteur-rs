@@ -2,6 +2,7 @@ use crate::actors::envelope::Letter;
 use crate::services::handle::Notify;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
+use crate::services::system_facade::System;
 use async_std::sync::Sender;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -11,7 +12,7 @@ use std::marker::PhantomData;
 pub(crate) trait ServiceEnvelope: Send + Debug {
     type Service: Service;
 
-    async fn dispatch(&mut self, service: &Self::Service);
+    async fn dispatch(&mut self, service: &Self::Service, system: &System);
 }
 
 /// For send without response we can use the normal Letter struct
@@ -27,9 +28,9 @@ impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
         }
     }
 
-    pub async fn dispatch_service(&mut self, service: &S) {
+    pub async fn dispatch_service(&mut self, service: &S, system: &System) {
         if let Some(message) = self.message.take() {
-            <S as Notify<M>>::handle(service, message).await;
+            <S as Notify<M>>::handle(service, message, system).await;
         }
     }
 }
@@ -39,8 +40,8 @@ impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
 impl<S: Service + Notify<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
     type Service = S;
 
-    async fn dispatch(&mut self, service: &Self::Service) {
-        Letter::<S, M>::dispatch_service(self, service).await;
+    async fn dispatch(&mut self, service: &Self::Service, system: &System) {
+        Letter::<S, M>::dispatch_service(self, service, system).await;
     }
 }
 
@@ -65,10 +66,10 @@ impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
         }
     }
 
-    async fn dispatch(&mut self, service: &S) {
+    async fn dispatch(&mut self, service: &S, system: &System) {
         if let Some(message) = self.message.take() {
             if let Some(responder) = self.responder.take() {
-                let result = <S as Serve<M>>::handle(service, message).await;
+                let result = <S as Serve<M>>::handle(service, message, system).await;
                 responder.send(result).await;
             }
         }
@@ -80,7 +81,7 @@ impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
 impl<S: Service + Serve<M>, M: Debug + Send> ServiceEnvelope for ServiceLetterWithResponders<S, M> {
     type Service = S;
 
-    async fn dispatch(&mut self, service: &Self::Service) {
-        ServiceLetterWithResponders::<S, M>::dispatch(self, service).await;
+    async fn dispatch(&mut self, service: &Self::Service, system: &System) {
+        ServiceLetterWithResponders::<S, M>::dispatch(self, service, system).await;
     }
 }

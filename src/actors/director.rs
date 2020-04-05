@@ -1,7 +1,7 @@
-use crate::system_director::SystemDirector;
 use crate::actors::envelope::{ManagerLetter, ManagerLetterWithResponder};
 use crate::actors::manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::actors::proxy::ActorReport;
+use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
 use async_std::sync::channel;
 use async_std::sync::{Arc, Sender};
