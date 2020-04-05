@@ -3,6 +3,35 @@
 //! An actor system written in Rust that just works. Simple, robust, fast, documented.
 //!
 //! ## Overall features of Acteur
+//! 
+//! Acteur uses async_std under the hood. This actor system work under the following premises:
+//! 
+//!  - **Simplicity**: The API should be small, simple and intuitive
+//!  - **Speed**: The system should be fast and use all available CPU cores
+//!  - **Documented**: Everything must be documented with exhaustive examples
+//! 
+//! Regarding the implementation:
+//! 
+//!  - Actors have an ID which type is defined by the user for each Actor type
+//!  - Messages are routed to an Actor and an ID
+//!  - Actor life-cycle is automatically handled by the framework
+//!  - Actors are automatically de/allocated depending of their usage
+//!  - Messages for the same Actor & ID are ordered. Everything else is executed concurrently.
+//! 
+//! ### State of the implementation
+//! 
+//! - DONE - Actor is activated on first message
+//! - DONE - Actor can send messages to other actors
+//! - DONE - System can send messages to any actor
+//! - DONE - Actor self stop
+//! - DONE - Stop waits for all actors to consume all messages
+//! - DONE - System statistics
+//! - DONE - RPC like messages between actors
+//! - BETA - Services (statefull or stateless, like actors, without ID and processing messages concurrently)
+//! - TODO - Automatic deallocation of unused actors
+//! - TODO - Subscribe to message
+//! - TODO - Fan-out messages
+//! - TODO - Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 //!
 //! ## Example
 //!
@@ -53,7 +82,7 @@
 mod utils;
 mod actors;
 mod facade;
-pub mod services;
+mod services;
 mod system_director;
 
 pub use actors::actor::Actor;
