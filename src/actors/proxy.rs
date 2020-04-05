@@ -1,3 +1,4 @@
+use crate::system_director::SystemDirector;
 use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::actors::manager::ActorsManager;
@@ -29,6 +30,7 @@ pub(crate) struct ActorProxy<A: Actor> {
 
 impl<A: Actor> ActorProxy<A> {
     pub fn new(
+        system_director: SystemDirector,
         actors_director: ActorsDirector,
         manager: ActorsManager<A>,
         id: A::Id,
@@ -36,7 +38,7 @@ impl<A: Actor> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
             channel(5);
 
-        let assistant = Assistant::new(actors_director.clone(), manager.clone(), id.clone());
+        let assistant = Assistant::new(system_director, actors_director, manager.clone(), id.clone());
 
         actor_loop(id, sender.clone(), receiver, assistant, manager);
 

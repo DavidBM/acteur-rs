@@ -27,7 +27,7 @@ impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
         }
     }
 
-    pub async fn dispatch_service(&mut self, service: &mut S) {
+    pub async fn dispatch_service(&mut self, service: &S) {
         if let Some(message) = self.message.take() {
             <S as Notify<M>>::handle(service, message).await;
         }
@@ -40,7 +40,7 @@ impl<S: Service + Notify<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
     type Service = S;
 
     async fn dispatch(&mut self, service: &Self::Service) {
-        Letter::<S, M>::dispatch(self, service).await;
+        Letter::<S, M>::dispatch_service(self, service).await;
     }
 }
 
@@ -54,7 +54,7 @@ pub(crate) struct ServiceLetterWithResponders<S: Service + Serve<M>, M: Debug> {
 
 /// For messages with a response we need to use a different structure than LetterWithResponder
 impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
-    fn new(message: M, responder: Sender<<S as Serve<M>>::Response>) -> Self
+    pub fn new(message: M, responder: Sender<<S as Serve<M>>::Response>) -> Self
     where
         S: Serve<M>,
     {

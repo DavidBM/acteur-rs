@@ -1,3 +1,4 @@
+use crate::system_director::SystemDirector;
 use crate::actors::envelope::{ManagerLetter, ManagerLetterWithResponder};
 use crate::actors::manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::actors::proxy::ActorReport;
@@ -22,6 +23,7 @@ pub(crate) struct ActorsDirector {
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
     is_stopping: Arc<AtomicBool>,
+    system: Arc<Option<SystemDirector>>,
 }
 
 impl ActorsDirector {
@@ -30,6 +32,19 @@ impl ActorsDirector {
             managers: Arc::new(DashMap::new()),
             waker: Arc::new(AtomicWaker::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
+            system: Arc::new(None),
+        }
+    }
+
+    pub(crate) fn set_system(&mut self, system: SystemDirector) {
+        if self.system.is_none() {
+            if let Some(old_system) = Arc::get_mut(&mut self.system) {
+                *old_system = Some(system);
+            } else {
+                unreachable!();
+            }
+        } else {
+            unreachable!();
         }
     }
 
@@ -56,7 +71,7 @@ impl ActorsDirector {
         }
     }
 
-    pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+    pub(crate) async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
@@ -69,7 +84,7 @@ impl ActorsDirector {
     }
 
     // TODO: Create a proper return type without &str
-    pub async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+    pub(crate) async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
@@ -85,7 +100,7 @@ impl ActorsDirector {
         receiver.recv().await.ok_or("Ups!")
     }
 
-    pub async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
+    pub(crate) async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
         self.get_or_create_manager_sender::<A>()
             .send(ActorManagerProxyCommand::EndActor(actor_id))
             .await;
@@ -96,7 +111,8 @@ impl ActorsDirector {
     }
 
     pub(crate) fn create_manager<A: Actor>(&self) -> ActorsManager<A> {
-        ActorsManager::<A>::new(self.clone())
+        // We use unwrap here as we must guarantee that there is a system director in every other director
+        ActorsManager::<A>::new(self.clone(), self.system.as_ref().as_ref().unwrap().clone())
     }
 
     pub(crate) async fn signal_manager_removed(&self) {
@@ -137,6 +153,7 @@ impl Clone for ActorsDirector {
             managers: self.managers.clone(),
             waker: self.waker.clone(),
             is_stopping: self.is_stopping.clone(),
+            system: self.system.clone(),
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::system_director::SystemDirector;
 use crate::actors::director::ActorsDirector;
 use crate::actors::manager::ActorsManager;
 use crate::{Actor, Receive, Respond};
@@ -72,6 +73,7 @@ use std::fmt::Debug;
 /// ```
 ///
 pub struct Assistant<A: Actor> {
+    system_director: SystemDirector,
     actors_director: ActorsDirector,
     actor_id: A::Id,
     manager: ActorsManager<A>,
@@ -79,11 +81,13 @@ pub struct Assistant<A: Actor> {
 
 impl<A: Actor> Assistant<A> {
     pub(crate) fn new(
+        system_director: SystemDirector,
         actors_director: ActorsDirector,
         manager: ActorsManager<A>,
         actor_id: A::Id,
     ) -> Assistant<A> {
         Assistant {
+            system_director,
             actors_director,
             actor_id,
             manager,
@@ -121,7 +125,7 @@ impl<A: Actor> Assistant<A> {
     /// Send an stop message to all actors in the system.
     /// Actors will process all the enqued messages before stop
     pub fn stop_system(&self) {
-        let system = self.actors_director.clone();
+        let system = self.system_director.clone();
 
         task::spawn(async move {
             system.stop().await;
@@ -135,6 +139,7 @@ impl<A: Actor> Clone for Assistant<A> {
             actors_director: self.actors_director.clone(),
             actor_id: self.actor_id.clone(),
             manager: self.manager.clone(),
+            system_director: self.system_director.clone(),
         }
     }
 }

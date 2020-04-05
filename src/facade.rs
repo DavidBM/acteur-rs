@@ -1,4 +1,6 @@
 use crate::actors::proxy::ActorReport;
+use crate::services::handle::{Notify, Serve};
+use crate::services::service::Service;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
 use async_std::task;
@@ -85,6 +87,45 @@ impl Acteur {
         message: M,
     ) -> Result<<A as Respond<M>>::Response, &str> {
         task::block_on(async move { self.call::<A, M>(actor_id, message).await })
+    }
+
+    /// Sends a message to a Service.
+    ///
+    /// This method will execute the [Notify::handle](./trait.Notify.html) implemented for
+    /// that Message and Service.
+    ///
+    /// If the Service is not loaded in Ram, this method will load them first
+    /// by calling their "initialize" method.
+    pub async fn notify<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
+        self.system_director.send_to_service::<S, M>(message).await;
+    }
+
+    /// Same as `notify` method, but sync version.
+    pub fn notify_sync<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
+        task::block_on(async move { self.notify::<S, M>(message).await })
+    }
+
+    /// As notify method, it sends a message to a Service but this one
+    /// wait for a response from the actor.
+    ///
+    /// This method will execute the [Serve::handle](./trait.Serve.html) implemented for
+    /// that Message and Service.
+    ///
+    /// If the Service is not loaded in Ram, this method will load them first
+    /// by calling their "initialize" method.
+    pub async fn request<S: Service + Serve<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) -> Result<<S as Serve<M>>::Response, &str> {
+        self.system_director.call_to_service::<S, M>(message).await
+    }
+
+    /// Same as `request` method, but sync version.
+    pub fn request_sync<S: Service + Serve<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) -> Result<<S as Serve<M>>::Response, &str> {
+        task::block_on(async move { self.request::<S, M>(message).await })
     }
 
     /// Send an stop message to all actors in the system.

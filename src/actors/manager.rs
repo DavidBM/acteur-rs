@@ -1,3 +1,4 @@
+use crate::system_director::SystemDirector;
 use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::ManagerEnvelope;
 use crate::actors::proxy::{ActorProxy, ActorReport};
@@ -40,7 +41,7 @@ pub(crate) struct ActorsManager<A: Actor> {
 }
 
 impl<A: Actor> ActorsManager<A> {
-    pub fn new(actors_director: ActorsDirector) -> ActorsManager<A> {
+    pub fn new(actors_director: ActorsDirector, system_director: SystemDirector) -> ActorsManager<A> {
         // Channel in order to receive commands (like sending messages to actors, stopping, etc)
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
 
@@ -61,6 +62,7 @@ impl<A: Actor> ActorsManager<A> {
             actors_director,
             manager.clone(),
             is_ending,
+            system_director,
         ));
 
         manager
@@ -138,17 +140,18 @@ impl<A: Actor> ActorsManager<A> {
     }
 }
 
-async fn actor_manager_loop<A: Actor>(
+async fn actor_manager_loop<'a, A: Actor>(
     receiver: Receiver<ActorManagerProxyCommand<A>>,
     actors: Arc<DashMap<A::Id, ActorProxy<A>>>,
     actors_director: ActorsDirector,
     manager: ActorsManager<A>,
     is_ending: Arc<AtomicBool>,
+    system_director: SystemDirector,
 ) {
     while let Some(command) = receiver.recv().await {
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
-                process_dispatch_command(command, &actors, &actors_director, &manager, &is_ending)
+                process_dispatch_command(command, &actors, &actors_director, &manager, &is_ending, &system_director)
                     .await;
             }
             ActorManagerProxyCommand::EndActor(actor_id) => {
@@ -173,6 +176,7 @@ async fn process_dispatch_command<'a, A: Actor>(
     actors_director: &'a ActorsDirector,
     manager: &'a ActorsManager<A>,
     is_ending: &'a Arc<AtomicBool>,
+    system_director: &'a SystemDirector,
 ) {
     let actor_id = command.get_actor_id();
 
@@ -182,7 +186,7 @@ async fn process_dispatch_command<'a, A: Actor>(
     }
 
     let mut actor =
-        ActorProxy::<A>::new(actors_director.clone(), manager.clone(), actor_id.clone());
+        ActorProxy::<A>::new(system_director.clone(), actors_director.clone(), manager.clone(), actor_id.clone());
 
     command.deliver(&mut actor).await;
 

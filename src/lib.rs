@@ -60,3 +60,5 @@ pub use actors::actor::Actor;
 pub use actors::assistant::Assistant;
 pub use actors::handle::{Receive, Respond};
 pub use facade::Acteur;
+pub use services::handle::{Notify, Serve};
+pub use services::service::Service;
