@@ -1,5 +1,5 @@
 use crate::actors::actor::Actor;
-use crate::actors::director::ActorsDirector;
+use crate::actors::director::{ActorsDirector, ActorsDirectorConfiguration};
 use crate::actors::handle::Receive;
 use crate::actors::handle::Respond;
 use crate::actors::proxy::ActorReport;
@@ -20,7 +20,10 @@ pub(crate) struct SystemDirector {
 
 impl SystemDirector {
     pub(crate) fn new() -> SystemDirector {
-        let mut actors_director = Arc::new(ActorsDirector::new());
+        let mut actors_director = Arc::new(ActorsDirector::new(ActorsDirectorConfiguration {
+            innactivity_seconds_until_actor_end: 300,
+        }));
+
         let mut services_director = Arc::new(ServicesDirector::new());
 
         let system = SystemDirector {

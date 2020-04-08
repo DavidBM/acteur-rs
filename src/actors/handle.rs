@@ -66,7 +66,10 @@ pub trait Receive<M: Debug>
 where
     Self: Sized + Actor,
 {
-    /// This method is called each time a message is received. You can use the [Assistant](./struct.Assistant.html) to send messages
+    /// This method is called each time a message is received.
+    /// You can use the [Assistant](./struct.Assistant.html) to send messages from actors,
+    /// [`System`](./struct.System.html) to send messages from services and
+    /// [`Acteur`](./struct.System.html) to send messages from outside the framework
     async fn handle(&mut self, message: M, assistant: &Assistant<Self>);
 }
 
@@ -149,6 +152,9 @@ where
 #[async_trait]
 pub trait Respond<M: Debug>: Sized + Actor {
     type Response: Send;
-    /// This method is called each time a message is received. You can use the [Assistant](./struct.Assistant.html) to send messages
+    /// This method is called each time a message is received.
+    /// You can use the [Assistant](./struct.Assistant.html) to send messages from actors,
+    /// [`System`](./struct.System.html) to send messages from services and
+    /// [`Acteur`](./struct.System.html) to send messages from outside the framework
     async fn handle(&mut self, message: M, assistant: &Assistant<Self>) -> Self::Response;
 }

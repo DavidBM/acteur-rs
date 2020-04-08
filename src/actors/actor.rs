@@ -4,17 +4,18 @@ use std::hash::Hash;
 
 /// The main Trait from this crate.
 ///
-/// This this Trait you define enable your structs to be used as actors.
-/// You will need to use [`Handle`](./trait.Handle.html) Trait in order to accept messages.
+/// This Trait enable your structs to be used as actors.
+/// You will need to use [`Handle`](./trait.Handle.html) or [`Respond`](./trait.Respond.html) Traits in order to accept messages.
 ///
-/// Actors are required to contain an Id, this Id type is defined by you.
-/// The only constrains for such Id are `Eq + Hash + Send + Sync + Clone + Debug`
+/// Actors are required to have an Id which type is defined by the developer.
+/// The constrains for such Id are `Eq + Hash + Send + Sync + Clone + Debug`
 ///
 /// ```rust,no_run
 /// use acteur::{Actor, Assistant};
 /// use async_trait::async_trait;
 ///
-/// // You can use any normal struct as an actor. It will contain the actor state..
+/// // You can use any normal struct as an actor. It will contain the actor state. No Arc/Mutex
+/// // is required as only one message per instance (different Id) will be handled.
 /// #[derive(Debug)]
 /// struct Employee {
 ///     id: u32,
@@ -35,7 +36,7 @@ use std::hash::Hash;
 ///         }
 ///     }
 ///
-///     // This method allows you to delete resources, close sockets, etc.
+///     // This method is optional and allows you to delete resources, close sockets, etc.
 ///     async fn deactivate(&mut self) {
 ///         println!("Employee {:?} deactivated!", self.id);
 ///     }

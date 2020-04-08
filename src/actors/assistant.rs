@@ -6,8 +6,10 @@ use crate::{Actor, Receive, Respond};
 use async_std::task;
 use std::fmt::Debug;
 
-/// This object is provided to the handle method in the [Receive](./trait.Receive.html) trait for each message
-/// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
+/// This object is provided to the handle method in [Receive](./trait.Receive.html) and [Respond](./trait.Respond.html)
+/// traits for each message that an Actor receives.
+///
+/// The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no_run
 /// # use acteur::{Actor, Receive, Assistant, Acteur};
@@ -133,6 +135,11 @@ impl<A: Actor> Assistant<A> {
         self.actors_director
             .stop_actor::<A>(self.actor_id.clone())
             .await;
+    }
+
+    /// Returns the Actor's Id defined by the [`Actor`](./trait.Actor.html) Trait
+    pub async fn get_id(&self) -> &A::Id {
+        &self.actor_id
     }
 
     /// Send an stop message to all actors in the system.

@@ -16,7 +16,11 @@ use std::{
     task::{Context, Poll},
 };
 
-// TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
+#[derive(Debug)]
+pub(crate) struct ActorsDirectorConfiguration {
+    pub(crate) innactivity_seconds_until_actor_end: u32,
+}
+
 #[derive(Debug)]
 pub(crate) struct ActorsDirector {
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
@@ -24,15 +28,17 @@ pub(crate) struct ActorsDirector {
     waker: Arc<AtomicWaker>,
     is_stopping: Arc<AtomicBool>,
     system: Arc<Option<SystemDirector>>,
+    configuration: Arc<ActorsDirectorConfiguration>,
 }
 
 impl ActorsDirector {
-    pub(crate) fn new() -> ActorsDirector {
+    pub(crate) fn new(configuration: ActorsDirectorConfiguration) -> ActorsDirector {
         ActorsDirector {
             managers: Arc::new(DashMap::new()),
             waker: Arc::new(AtomicWaker::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
             system: Arc::new(None),
+            configuration: Arc::new(configuration),
         }
     }
 
@@ -83,11 +89,11 @@ impl ActorsDirector {
             .await;
     }
 
-    // TODO: Create a proper return type without &str
     pub(crate) async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
+        // TODO: Create a proper return type without &str
     ) -> Result<<A as Respond<M>>::Response, &str> {
         let (sender, receiver) = channel::<<A as Respond<M>>::Response>(1);
 
@@ -112,7 +118,11 @@ impl ActorsDirector {
 
     pub(crate) fn create_manager<A: Actor>(&self) -> ActorsManager<A> {
         // We use unwrap here as we must guarantee that there is a system director in every other director
-        ActorsManager::<A>::new(self.clone(), self.system.as_ref().as_ref().unwrap().clone())
+        ActorsManager::<A>::new(
+            self.clone(),
+            self.system.as_ref().as_ref().unwrap().clone(),
+            std::time::Duration::from_secs(300),
+        )
     }
 
     pub(crate) async fn signal_manager_removed(&self) {
@@ -154,6 +164,7 @@ impl Clone for ActorsDirector {
             waker: self.waker.clone(),
             is_stopping: self.is_stopping.clone(),
             system: self.system.clone(),
+            configuration: self.configuration.clone(),
         }
     }
 }

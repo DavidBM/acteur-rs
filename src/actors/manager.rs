@@ -13,6 +13,7 @@ use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 #[async_trait::async_trait]
 pub(crate) trait Manager: Send + Sync + Debug {
@@ -44,6 +45,7 @@ impl<A: Actor> ActorsManager<A> {
     pub fn new(
         actors_director: ActorsDirector,
         system_director: SystemDirector,
+        innactivity_duration_until_end: Duration,
     ) -> ActorsManager<A> {
         // Channel in order to receive commands (like sending messages to actors, stopping, etc)
         let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
@@ -66,6 +68,7 @@ impl<A: Actor> ActorsManager<A> {
             manager.clone(),
             is_ending,
             system_director,
+            innactivity_duration_until_end,
         ));
 
         manager
@@ -150,6 +153,7 @@ async fn actor_manager_loop<'a, A: Actor>(
     manager: ActorsManager<A>,
     is_ending: Arc<AtomicBool>,
     system_director: SystemDirector,
+    innactivity_duration_until_end: Duration,
 ) {
     while let Some(command) = receiver.recv().await {
         match command {
@@ -161,6 +165,7 @@ async fn actor_manager_loop<'a, A: Actor>(
                     &manager,
                     &is_ending,
                     &system_director,
+                    &innactivity_duration_until_end,
                 )
                 .await;
             }
@@ -187,6 +192,7 @@ async fn process_dispatch_command<'a, A: Actor>(
     manager: &'a ActorsManager<A>,
     is_ending: &'a Arc<AtomicBool>,
     system_director: &'a SystemDirector,
+    innactivity_duration_until_end: &'a Duration,
 ) {
     let actor_id = command.get_actor_id();
 
@@ -200,6 +206,7 @@ async fn process_dispatch_command<'a, A: Actor>(
         actors_director.clone(),
         manager.clone(),
         actor_id.clone(),
+        innactivity_duration_until_end.clone(),
     );
 
     command.deliver(&mut actor).await;
