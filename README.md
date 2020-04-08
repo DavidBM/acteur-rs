@@ -45,7 +45,8 @@ Regarding the implementation:
 - [x] Actor self stop
 - [x] Stop waits for all actors to consume all messages
 - [x] System statistics
-- [ ] Automatic deallocation of unused actors
+- [x] Automatic deallocation of unused actors (based in inactive time)
+- [ ] Actor deallocation configuration (based in RAM, Actor count or timeout)
 - [ ] Subscribe to message
 - [ ] Fan-out messages
 - [x] RPC like messages between actors
