@@ -34,7 +34,35 @@
 //! - □ Fan-out messages
 //! - □ Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 //!
-//! ## Example
+//! ## Actors & Services
+//!
+//! Acteur provides 2 ways of concurrency. Actors and Services. 
+//!
+//! ### Actors
+//!
+//! Actors have an ID and will consume messages directed to the same Actor's ID sequentially. That means that if you have
+//! if you send 2 messages to the Actor User-32, they will be executed in order. On the other side, if you send a message 
+//! to the Actor User-32 and other to the User-52 they will consume the messages concurrently.
+//! 
+//! That means, Actors instances keep the messages order for the same ID, but not between different IDs. 
+//! 
+//! ### Services
+//! 
+//! Services, on the other side, have no ID and they have concurrency. That means that you choose how many instances of 
+//! the Service there will be (Acteur provides a default). Services can or can't have an State, but if they have, they 
+//! require to be Sync (aka Mutex<state>). 
+//! 
+//! In short. Services are like services in servers. You can have many instances and there is no sychronization of any
+//! type when consuming messages.
+//! 
+//! ### Use cases
+//! 
+//! Choose Actor for Entities (Users, Invoices, Players, anything which their instances are identified).
+//! 
+//! Choose Services for Business Logic, Infrastructure, Adaptors, etc (Storage, DB access, HTTP services, 
+//! calculations of some sort that doesn't belong to any Actor, etc)
+//! 
+//! ## Simple Example
 //!
 //! ```rust,no_run
 //! use acteur::{Actor, Receive, Assistant, Acteur};
