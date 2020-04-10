@@ -48,27 +48,31 @@ impl ServicesDirector {
     }
 
     // Ensures that there is a manager for that type and returns a sender to it
-    async fn get_or_create_manager_sender<A: Service>(&self) -> Sender<ServiceManagerCommand<A>> {
-        let type_id = TypeId::of::<A>();
+    async fn get_or_create_manager_sender<S: Service>(&self) -> Sender<ServiceManagerCommand<S>> {
+        let type_id = TypeId::of::<S>();
 
         let managers_entry = self.managers.entry(type_id);
 
         let any_sender = match managers_entry {
             Entry::Occupied(entry) => entry.into_ref(),
             Entry::Vacant(entry) => {
-                let manager = self.create_manager::<A>().await;
+                let manager = self.create_manager::<S>().await;
                 entry.insert(Box::new(manager))
             }
         }
         .get_sender_as_any()
         .await;
 
-        match any_sender.downcast::<Sender<ServiceManagerCommand<A>>>() {
+        match any_sender.downcast::<Sender<ServiceManagerCommand<S>>>() {
             Ok(sender) => *sender,
             // If type is not matching, crash as  we don't really want to
             // run the framework with a bug like that
             Err(_) => unreachable!(),
         }
+    }
+
+    pub(crate) async fn preload<S: Service>(&self) {
+        self.get_or_create_manager_sender::<S>().await;
     }
 
     pub(crate) async fn send<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {

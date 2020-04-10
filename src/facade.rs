@@ -143,6 +143,20 @@ impl Acteur {
         });
     }
 
+    /// Ensures a service is loaded and running.
+    /// It ensures that all Service's subscriptions are performed
+    pub async fn preload_service<S: Service>(&self) {
+        self.system_director.preload_service::<S>().await;
+    }
+
+    /// Same as `preload_service` but sync version
+    pub async fn preload_service_sync<S: Service>(&self) {
+        let system = self.system_director.clone();
+        task::block_on(async move {
+            system.preload_service::<S>().await;
+        });
+    }
+
     /// Waits until all actors are stopped.
     /// If you call "system.stop()" this method will wait untill all actor
     /// have consumed all messages before returning.

@@ -75,6 +75,10 @@ impl SystemDirector {
         self.services_director.call::<S, M>(message).await
     }
 
+    pub(crate) async fn preload_service<S: Service>(&self) {
+        self.services_director.preload::<S>().await;
+    }
+
     pub(crate) async fn wait_until_stopped(&self) {
         let actors_future = self.actors_director.wait_until_stopped();
         let services_future = self.services_director.wait_until_stopped();

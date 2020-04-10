@@ -36,32 +36,48 @@
 //!
 //! ## Actors & Services
 //!
-//! Acteur provides 2 ways of concurrency. Actors and Services. 
+//! Acteur provides 2 ways of concurrency. Actors and Services.
 //!
 //! ### Actors
 //!
 //! Actors have an ID and will consume messages directed to the same Actor's ID sequentially. That means that if you have
-//! if you send 2 messages to the Actor User-32, they will be executed in order. On the other side, if you send a message 
+//! if you send 2 messages to the Actor User-32, they will be executed in order. On the other side, if you send a message
 //! to the Actor User-32 and other to the User-52 they will consume the messages concurrently.
-//! 
-//! That means, Actors instances keep the messages order for the same ID, but not between different IDs. 
-//! 
+//!
+//! That means, Actors instances keep the messages order for the same ID, but not between different IDs.
+//!
 //! ### Services
-//! 
-//! Services, on the other side, have no ID and they have concurrency. That means that you choose how many instances of 
-//! the Service there will be (Acteur provides a default). Services can or can't have an State, but if they have, they 
-//! require to be Sync (aka Mutex<state>). 
-//! 
-//! In short. Services are like services in servers. You can have many instances and there is no sychronization of any
-//! type when consuming messages.
-//! 
+//!
+//! Services, on the other side, have no ID and they have concurrency. That means that you choose how many instances of
+//! the Service there will be (Acteur provides a default). Services can or can't have an State, but if they have, they
+//! require to be Sync (aka Mutex<state>).
+//!
+//! In short. Services are like normal web services. You can have many instances and there is no synchronization of any
+//! type when consuming messages. Think of them as the primitive you use when you want to create something that doesn't
+//! fit the Actors model in this framework.
+//!
 //! ### Use cases
-//! 
+//!
 //! Choose Actor for Entities (Users, Invoices, Players, anything which their instances are identified).
-//! 
-//! Choose Services for Business Logic, Infrastructure, Adaptors, etc (Storage, DB access, HTTP services, 
+//!
+//! Choose Services for Business Logic, Infrastructure, Adapters, etc (Storage, DB access, HTTP services,
 //! calculations of some sort that doesn't belong to any Actor, etc)
-//! 
+//!
+//! ## Subscription or Pub/Sub (not yet implemented)
+//!
+//! Sometime we don't want to direct messages to destination, but to subscribe to a type and wait. Acteur models the
+//! Pub/Sub patter with Services. Actors in Acteur can't perform subscriptions as that would require the framework to
+//! know all possible IDs of all possible Actor instances in order to direct the message to the correct one.
+//!
+//! If you want to send messages to some Actors from a Subscription, you can create a Service that subscribes to a message
+//! and then figures out to what Actor IDs to send the message. For example, doing a query in the DB in order to get the
+//! set of IDs that need to receive some message.
+//!
+//! Unlike sending/calling to services/actors, subscription doesn't know who needs to receive the message. That is the   
+//! reason behind requiring the Services to subscribe in runtime to any message they want to receive. In order to ensure  
+//! that services perform the subscriptions, it is a good idea to run `acteur.preload_service<Service>();` for each service
+//! that should perform any subscription at the beginning of your Application start.
+//!
 //! ## Simple Example
 //!
 //! ```rust,no_run
