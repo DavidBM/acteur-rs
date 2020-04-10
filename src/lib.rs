@@ -20,19 +20,19 @@
 //!
 //! ### State of the implementation
 //!
-//! - DONE - Actor is activated on first message
-//! - DONE - Actor can send messages to other actors
-//! - DONE - System can send messages to any actor
-//! - DONE - Actor self stop
-//! - DONE - Stop waits for all actors to consume all messages
-//! - DONE - System statistics
-//! - DONE - RPC like messages between actors
-//! - DONE - Services (statefull or stateless, like actors, without ID and processing messages concurrently)
-//! - DONE - Automatic deallocation of unused actors
-//! - TODO - ctor deallocation configuration (based in RAM, Actor count or timeout)
-//! - TODO - Subscribe to message
-//! - TODO - Fan-out messages
-//! - TODO - Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
+//! - ☑️ Actor is activated on first message
+//! - ☑️ Actor can send messages to other actors
+//! - ☑️ System can send messages to any actor
+//! - ☑️ Actor self stop
+//! - ☑️ Stop waits for all actors to consume all messages
+//! - ☑️ System statistics
+//! - ☑️ RPC like messages between actors
+//! - ☑️ Services (statefull or stateless, like actors, without ID and processing messages concurrently)
+//! - ☑️ Automatic deallocation of unused actors
+//! - □ Actor deallocation configuration (based in RAM, Actor count or timeout)
+//! - □ Subscribe to message
+//! - □ Fan-out messages
+//! - □ Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 //!
 //! ## Example
 //!
