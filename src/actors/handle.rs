@@ -7,7 +7,7 @@ use std::fmt::Debug;
 ///
 /// If you want to respond to messages, use the [Respond trait](./trait.Respond.html).
 ///
-/// This trait is compatible with [Respond trait](./trait.Receive.html) as you can implement, for the same message,
+/// This trait is compatible with [Respond trait](./trait.Respond.html) as you can implement, for the same message,
 /// both traits. This trait will be executed when using the "send" or "send_sync" method from System or the "send"
 /// method from Assistant.
 ///
@@ -51,14 +51,12 @@ use std::fmt::Debug;
 /// fn main() {
 ///     let sys = Acteur::new();
 ///
-///     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+///     sys.send_to_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 ///
 ///     sys.wait_until_stopped();
 /// }
 ///
 /// ```
-///
-/// You can use the [Assistant](./struct.Assistant.html) in order to interact with other actors and the system.
 ///
 ///
 #[async_trait]
@@ -137,7 +135,7 @@ where
 /// fn main() {
 ///     let sys = Acteur::new();
 ///
-///     let response = sys.call_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+///     let response = sys.call_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 ///
 ///     println!("Response is: {:?}", response); // Response is: Thanks!
 ///

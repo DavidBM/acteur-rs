@@ -7,7 +7,7 @@ use crate::services::director::ServicesDirector;
 use crate::services::handle::Notify;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
-use async_std::sync::Arc;
+use async_std::{sync::Arc, task::block_on};
 use futures::join;
 use std::any::TypeId;
 use std::fmt::Debug;
@@ -21,7 +21,7 @@ pub(crate) struct SystemDirector {
 impl SystemDirector {
     pub(crate) fn new() -> SystemDirector {
         let mut actors_director = Arc::new(ActorsDirector::new(ActorsDirectorConfiguration {
-            innactivity_seconds_until_actor_end: 300,
+            innactivity_seconds_until_actor_end: std::time::Duration::from_secs(300),
         }));
 
         let mut services_director = Arc::new(ServicesDirector::new());
@@ -31,15 +31,18 @@ impl SystemDirector {
             services_director: services_director.clone(),
         };
 
-        if let Some(value) = Arc::get_mut(&mut actors_director) {
-            value.set_system(system.clone());
-        }
+        let system_to_retur = system.clone();
 
-        if let Some(value) = Arc::get_mut(&mut services_director) {
-            value.set_system(system.clone());
-        }
+        block_on(async move {
+            Arc::make_mut(&mut actors_director)
+                .set_system(system.clone())
+                .await;
+            Arc::make_mut(&mut services_director)
+                .set_system(system.clone())
+                .await;
+        });
 
-        system
+        system_to_retur
     }
 
     pub async fn send_to_actor<A: Actor + Receive<M>, M: Debug + Send + 'static>(
@@ -50,7 +53,7 @@ impl SystemDirector {
         self.actors_director.send::<A, M>(actor_id, message).await
     }
 
-    pub async fn call_to_actor<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+    pub async fn call_actor<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
@@ -65,7 +68,7 @@ impl SystemDirector {
         self.services_director.send::<S, M>(message).await
     }
 
-    pub async fn call_to_service<S: Service + Serve<M>, M: Debug + Send + 'static>(
+    pub async fn call_service<S: Service + Serve<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) -> Result<<S as Serve<M>>::Response, &str> {

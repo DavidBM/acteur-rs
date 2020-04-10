@@ -30,7 +30,7 @@ impl Receive<SalaryChanged> for Employee {
 fn main() {
     let sys = Acteur::new();
 
-    sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+    sys.send_to_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 
     sys.wait_until_stopped();
 }

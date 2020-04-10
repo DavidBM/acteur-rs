@@ -3,8 +3,7 @@ use crate::actors::manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::actors::proxy::ActorReport;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
-use async_std::sync::channel;
-use async_std::sync::{Arc, Sender};
+use async_std::sync::{channel, Arc, Mutex, Sender};
 use dashmap::{mapref::entry::Entry, DashMap};
 use futures::task::AtomicWaker;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
@@ -18,7 +17,7 @@ use std::{
 
 #[derive(Debug)]
 pub(crate) struct ActorsDirectorConfiguration {
-    pub(crate) innactivity_seconds_until_actor_end: u32,
+    pub(crate) innactivity_seconds_until_actor_end: std::time::Duration,
 }
 
 #[derive(Debug)]
@@ -27,7 +26,7 @@ pub(crate) struct ActorsDirector {
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
     is_stopping: Arc<AtomicBool>,
-    system: Arc<Option<SystemDirector>>,
+    system: Arc<Mutex<Option<SystemDirector>>>,
     configuration: Arc<ActorsDirectorConfiguration>,
 }
 
@@ -37,25 +36,23 @@ impl ActorsDirector {
             managers: Arc::new(DashMap::new()),
             waker: Arc::new(AtomicWaker::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
-            system: Arc::new(None),
+            system: Arc::new(Mutex::new(None)),
             configuration: Arc::new(configuration),
         }
     }
 
-    pub(crate) fn set_system(&mut self, system: SystemDirector) {
-        if self.system.is_none() {
-            if let Some(old_system) = Arc::get_mut(&mut self.system) {
-                *old_system = Some(system);
-            } else {
-                unreachable!();
-            }
+    pub(crate) async fn set_system(&mut self, system_director: SystemDirector) {
+        let mut system = self.system.lock().await;
+
+        if system.is_none() {
+            system.replace(system_director);
         } else {
             unreachable!();
         }
     }
 
     // Ensures that there is a manager for that type and returns a sender to it
-    fn get_or_create_manager_sender<A: Actor>(&self) -> Sender<ActorManagerProxyCommand<A>> {
+    async fn get_or_create_manager_sender<A: Actor>(&self) -> Sender<ActorManagerProxyCommand<A>> {
         let type_id = TypeId::of::<A>();
 
         let managers_entry = self.managers.entry(type_id);
@@ -63,7 +60,7 @@ impl ActorsDirector {
         let any_sender = match managers_entry {
             Entry::Occupied(entry) => entry.into_ref(),
             Entry::Vacant(entry) => {
-                let manager = self.create_manager::<A>();
+                let manager = self.create_manager::<A>().await;
                 entry.insert(Box::new(manager))
             }
         }
@@ -83,6 +80,7 @@ impl ActorsDirector {
         message: M,
     ) {
         self.get_or_create_manager_sender::<A>()
+            .await
             .send(ActorManagerProxyCommand::Dispatch(Box::new(
                 ManagerLetter::new(actor_id, message),
             )))
@@ -98,6 +96,7 @@ impl ActorsDirector {
         let (sender, receiver) = channel::<<A as Respond<M>>::Response>(1);
 
         self.get_or_create_manager_sender::<A>()
+            .await
             .send(ActorManagerProxyCommand::Dispatch(Box::new(
                 ManagerLetterWithResponder::new(actor_id, message, sender),
             )))
@@ -108,6 +107,7 @@ impl ActorsDirector {
 
     pub(crate) async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
         self.get_or_create_manager_sender::<A>()
+            .await
             .send(ActorManagerProxyCommand::EndActor(actor_id))
             .await;
     }
@@ -116,12 +116,18 @@ impl ActorsDirector {
         ActorsDirectorStopAwaiter::new(self.clone()).await;
     }
 
-    pub(crate) fn create_manager<A: Actor>(&self) -> ActorsManager<A> {
+    pub(crate) async fn create_manager<A: Actor>(&self) -> ActorsManager<A> {
         // We use unwrap here as we must guarantee that there is a system director in every other director
+        let system = if let Some(system) = &*self.system.lock().await {
+            system.clone()
+        } else {
+            unreachable!();
+        };
+
         ActorsManager::<A>::new(
             self.clone(),
-            self.system.as_ref().as_ref().unwrap().clone(),
-            std::time::Duration::from_secs(300),
+            system,
+            self.configuration.innactivity_seconds_until_actor_end,
         )
     }
 

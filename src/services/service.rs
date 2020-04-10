@@ -6,8 +6,9 @@ use std::fmt::Debug;
 /// ServiceConfiguration struct.
 ///
 /// ```rust,no-run
-/// use acteur::{System, service::{Service, Serve, }};
+/// use acteur::{Acteur, Service, Serve, System, ServiceConfiguration};
 ///
+/// #[derive(Debug)]
 /// struct EmployeeTaxesCalculator {
 ///     tax_rate: f32,
 /// }
@@ -25,25 +26,28 @@ use std::fmt::Debug;
 ///     }
 /// }
 ///
-/// struct EmployeeSalaryChange(u32);
+/// #[derive(Debug)]
+/// struct EmployeeSalaryChange(f32);
 ///
 /// #[async_trait::async_trait]
 /// impl Serve<EmployeeSalaryChange> for EmployeeTaxesCalculator {
-///     type Response: f32;
+///     type Response = f32;
 ///
 ///     async fn handle(&self, message: EmployeeSalaryChange, assistant: &System) -> f32 {
-///         self.tax_rate * message.0;
+///         self.tax_rate * message.0
 ///     }
 /// }
 ///
 /// fn main() {
-///     let sys = System::new();
+///     let sys = Acteur::new();
 ///
-///     sys.call_service_sync::<EmployeeTaxesCalculator, _>(EmployeeSalaryChange(55000));
+///     let taxes = sys.call_service_sync::<EmployeeTaxesCalculator, _>(EmployeeSalaryChange(55000.0)).unwrap();
+///
+///     println!("Employee taxes are: {:?}", taxes);
 ///
 ///     sys.stop();
 ///
-///     sys.wait_until_stop();
+///     sys.wait_until_stopped();
 /// }
 /// ```
 ///

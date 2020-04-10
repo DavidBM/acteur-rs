@@ -18,7 +18,7 @@ pub fn start() {
     for i in 0..1u32 {
         let message = TestMessage { field: i };
 
-        sys.send_sync::<TestActor<u32>, TestMessage>(43, message);
+        sys.send_to_actor_sync::<TestActor<u32>, TestMessage>(43, message);
     }
 
     sys.wait_until_stopped();
@@ -72,7 +72,7 @@ impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug> Receive<TestMessage> 
         }
 
         assistant
-            .send::<TestActor<u32>, TestMessage>(
+            .send_to_actor::<TestActor<u32>, TestMessage>(
                 message.field + 1,
                 TestMessage {
                     field: message.field + 1,

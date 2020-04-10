@@ -36,7 +36,7 @@ impl Respond<SalaryChanged> for Employee {
         // but we want to show how you can implement Receive and Response trait for the
         // same message.
         assistant
-            .send::<Employee, SalaryChanged>(self.id, message)
+            .send_to_actor::<Employee, SalaryChanged>(self.id, message)
             .await;
 
         String::from("Thanks!")
@@ -55,7 +55,7 @@ impl Receive<SalaryChanged> for Employee {
 fn main() {
     let sys = Acteur::new();
 
-    let response = sys.call_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+    let response = sys.call_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 
     println!("Response is: {:?}", response); // Response is: Thanks!
 

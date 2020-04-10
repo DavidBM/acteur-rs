@@ -8,68 +8,37 @@ use std::fmt::Debug;
 /// This object is provided to the handle method in the [Receive](./trait.Receive.html) trait for each message
 /// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
-/// ```rust,no_run
-/// # use acteur::{Actor, Receive, System, Acteur};
-/// # use async_trait::async_trait;
-/// #
-/// # #[derive(Debug)]
-/// # struct Employee {
-/// #     salary: u32,
-/// #     manager_id: u32,
-/// # }
-/// #
-/// # #[async_trait]
-/// # impl Actor for Employee {
-/// #     type Id = u32;
-/// #
-/// #     async fn activate(_: Self::Id) -> Self {
-/// #         Employee {
-/// #             salary: 0, // Load from DB or set a default,
-/// #             manager_id: 0 ,
-/// #         }
-/// #     }
-/// # }
-/// #
-/// # #[derive(Debug)]
-/// # struct Manager;
-/// #
-/// # #[async_trait]
-/// # impl Actor for Manager {
-/// #     type Id = u32;
-/// #
-/// #     async fn activate(_: Self::Id) -> Self {
-/// #         Manager
-/// #     }
-/// # }
-/// # #[async_trait]
-/// # impl Receive<SayByeForever> for Manager {
-/// #     async fn handle(&mut self, message: SayByeForever, assistant: &System<Manager>) {}
-/// # }
-/// #[derive(Debug)]
-/// struct SalaryChanged(u32);
+/// ```rust,no-run
+/// use acteur::{Acteur, Service, Notify, ServiceConfiguration, System};
 ///
 /// #[derive(Debug)]
-/// struct SayByeForever(String);
+/// struct EmployeeTaxesCalculator {
+///     tax_rate: f32,
+/// }
 ///
-/// #[async_trait]
-/// impl Receive<SalaryChanged> for Employee {
-///     async fn handle(&mut self, message: SalaryChanged, assistant: &System<Employee>) {
-///         if self.salary > message.0 {
-///             assistant.send::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
-///         }
-///         
-///         self.salary = message.0;
+/// #[async_trait::async_trait]
+/// impl Service for EmployeeTaxesCalculator {
+///     async fn initialize() -> (Self, ServiceConfiguration) {
+///         let service = EmployeeTaxesCalculator {
+///             tax_rate: 0.21,
+///         };
+///
+///         let service_conf = ServiceConfiguration::default();
+///
+///         (service, service_conf)
 ///     }
 /// }
 ///
-/// # fn main() {
-/// #     let sys = Acteur::new();
-/// #
-/// #     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
-/// #
-/// #     sys.wait_until_stopped();
-/// # }
+/// #[derive(Debug)]
+/// struct EmployeeSalaryChange(u32);
 ///
+/// #[async_trait::async_trait]
+/// impl Notify<EmployeeSalaryChange> for EmployeeTaxesCalculator {
+///
+///     async fn handle(&self, message: EmployeeSalaryChange, system: &System) {
+///         system.stop_system();
+///     }
+/// }
 /// ```
 ///
 pub struct System {
@@ -83,7 +52,7 @@ impl System {
 
     /// Sends a message to the Actor with the specified Id.
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_actor<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
@@ -95,29 +64,32 @@ impl System {
 
     /// Sends a message to the Actor with the specified Id and waits the actor's response .
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+    pub async fn call_actor<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
     ) -> Result<<A as Respond<M>>::Response, &str> {
         self.system_director
-            .call_to_actor::<A, M>(actor_id, message)
+            .call_actor::<A, M>(actor_id, message)
             .await
     }
 
     /// Sends a message to a Service.
     /// If the Service is not loaded, it will load the service before, calling its method `initialize`
-    pub async fn notify<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
+    pub async fn send_to_service<S: Service + Notify<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
         self.system_director.send_to_service::<S, M>(message).await
     }
 
     /// Sends a message to a Service and waits for its response.
     /// If the Service is not loaded, it will load the service before, calling its method `initialize`
-    pub async fn request<S: Service + Serve<M>, M: Debug + Send + 'static>(
+    pub async fn call_service<S: Service + Serve<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) -> Result<<S as Serve<M>>::Response, &str> {
-        self.system_director.call_to_service::<S, M>(message).await
+        self.system_director.call_service::<S, M>(message).await
     }
 
     /// Send an stop message to all actors in the system.

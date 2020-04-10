@@ -58,7 +58,7 @@ use std::fmt::Debug;
 /// impl Receive<SalaryChanged> for Employee {
 ///     async fn handle(&mut self, message: SalaryChanged, assistant: &Assistant<Employee>) {
 ///         if self.salary > message.0 {
-///             assistant.send::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
+///             assistant.send_to_actor::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
 ///         }
 ///         
 ///         self.salary = message.0;
@@ -68,7 +68,7 @@ use std::fmt::Debug;
 /// # fn main() {
 /// #     let sys = Acteur::new();
 /// #
-/// #     sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+/// #     sys.send_to_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 /// #
 /// #     sys.wait_until_stopped();
 /// # }
@@ -96,7 +96,7 @@ impl<A: Actor> Assistant<A> {
 
     /// Sends a message to the Actor with the specified Id.
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn send<A2: Actor + Receive<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_actor<A2: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A2::Id,
         message: M,
@@ -106,7 +106,7 @@ impl<A: Actor> Assistant<A> {
 
     /// Sends a message to the Actor with the specified Id and waits the actor's response .
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
-    pub async fn call<A2: Actor + Respond<M>, M: Debug + Send + 'static>(
+    pub async fn call_actor<A2: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A2::Id,
         message: M,
@@ -116,17 +116,20 @@ impl<A: Actor> Assistant<A> {
 
     /// Sends a message to a Service.
     /// If the Service is not loaded, it will load the service before, calling its method `initialize`
-    pub async fn notify<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
+    pub async fn send_to_service<S: Service + Notify<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
         self.system_director.send_to_service::<S, M>(message).await
     }
 
     /// Sends a message to a Service and waits for its response.
     /// If the Service is not loaded, it will load the service before, calling its method `initialize`
-    pub async fn request<S: Service + Serve<M>, M: Debug + Send + 'static>(
+    pub async fn call_service<S: Service + Serve<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) -> Result<<S as Serve<M>>::Response, &str> {
-        self.system_director.call_to_service::<S, M>(message).await
+        self.system_director.call_service::<S, M>(message).await
     }
 
     /// Enqueues a end command in the Actor messages queue. The actor will consume all mesages before ending.

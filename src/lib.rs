@@ -27,8 +27,9 @@
 //! - DONE - Stop waits for all actors to consume all messages
 //! - DONE - System statistics
 //! - DONE - RPC like messages between actors
-//! - BETA - Services (statefull or stateless, like actors, without ID and processing messages concurrently)
-//! - TODO - Automatic deallocation of unused actors
+//! - DONE - Services (statefull or stateless, like actors, without ID and processing messages concurrently)
+//! - DONE - Automatic deallocation of unused actors
+//! - TODO - ctor deallocation configuration (based in RAM, Actor count or timeout)
 //! - TODO - Subscribe to message
 //! - TODO - Fan-out messages
 //! - TODO - Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
@@ -68,7 +69,7 @@
 //! # fn main() {
 //! let sys = Acteur::new();
 //!
-//! sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+//! sys.send_to_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 //!
 //! sys.wait_until_stopped();
 //! # }
@@ -90,4 +91,5 @@ pub use actors::assistant::Assistant;
 pub use actors::handle::{Receive, Respond};
 pub use facade::Acteur;
 pub use services::handle::{Notify, Serve};
-pub use services::service::Service;
+pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
+pub use services::system_facade::System;

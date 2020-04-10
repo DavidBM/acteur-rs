@@ -5,8 +5,7 @@ use crate::services::handle::Serve;
 use crate::services::manager::{Manager, ServiceManager, ServiceManagerCommand};
 use crate::system_director::SystemDirector;
 use crate::Service;
-use async_std::sync::channel;
-use async_std::sync::{Arc, Sender};
+use async_std::sync::{channel, Arc, Mutex, Sender};
 use dashmap::{mapref::entry::Entry, DashMap};
 use futures::task::AtomicWaker;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
@@ -25,7 +24,7 @@ pub(crate) struct ServicesDirector {
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
     waker: Arc<AtomicWaker>,
     is_stopping: Arc<AtomicBool>,
-    system: Arc<Option<SystemDirector>>,
+    system: Arc<Mutex<Option<SystemDirector>>>,
 }
 
 impl ServicesDirector {
@@ -34,17 +33,15 @@ impl ServicesDirector {
             managers: Arc::new(DashMap::new()),
             waker: Arc::new(AtomicWaker::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
-            system: Arc::new(None),
+            system: Arc::new(Mutex::new(None)),
         }
     }
 
-    pub(crate) fn set_system(&mut self, system: SystemDirector) {
-        if self.system.is_none() {
-            if let Some(old_system) = Arc::get_mut(&mut self.system) {
-                *old_system = Some(system);
-            } else {
-                unreachable!();
-            }
+    pub(crate) async fn set_system(&mut self, system_director: SystemDirector) {
+        let mut system = self.system.lock().await;
+
+        if system.is_none() {
+            system.replace(system_director);
         } else {
             unreachable!();
         }
@@ -106,7 +103,13 @@ impl ServicesDirector {
 
     pub(crate) async fn create_manager<S: Service>(&self) -> ServiceManager<S> {
         // We use unwrap here as we must guarantee that there is a system director in every other director
-        ServiceManager::<S>::new(self.clone(), self.system.as_ref().as_ref().unwrap().clone()).await
+        let system = if let Some(system) = &*self.system.lock().await {
+            system.clone()
+        } else {
+            unreachable!();
+        };
+
+        ServiceManager::<S>::new(self.clone(), system).await
     }
 
     pub(crate) async fn signal_manager_removed(&self) {

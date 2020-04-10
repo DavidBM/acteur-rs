@@ -43,7 +43,7 @@ impl Acteur {
     ///
     /// If the actor is not loaded in Ram, this method will load them first
     /// by calling their "activate" method.
-    pub async fn send<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_actor<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
@@ -53,16 +53,16 @@ impl Acteur {
             .await;
     }
 
-    /// Same as `send` method, but sync version.
-    pub fn send_sync<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+    /// Same as `send_to_actor` method, but sync version.
+    pub fn send_to_actor_sync<A: Actor + Receive<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
     ) {
-        task::block_on(async move { self.send::<A, M>(actor_id, message).await })
+        task::block_on(async move { self.send_to_actor::<A, M>(actor_id, message).await })
     }
 
-    /// As send method, it sends a message to an actor with an ID but this one
+    /// As send_to_actor method, it sends a message to an actor with an ID but this one
     /// wait for a response from the actor.
     ///
     /// This method will execute the [Respond::handle](./trait.Respond.html) implemented for
@@ -70,23 +70,23 @@ impl Acteur {
     ///
     /// If the actor is not loaded in Ram, this method will load them first
     /// by calling their "activate" method.
-    pub async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+    pub async fn call_actor<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
     ) -> Result<<A as Respond<M>>::Response, &str> {
         self.system_director
-            .call_to_actor::<A, M>(actor_id, message)
+            .call_actor::<A, M>(actor_id, message)
             .await
     }
 
-    /// Same as `call` method, but sync version.
-    pub fn call_sync<A: Actor + Respond<M>, M: Debug + Send + 'static>(
+    /// Same as `call_actor` method, but sync version.
+    pub fn call_actor_sync<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,
         message: M,
     ) -> Result<<A as Respond<M>>::Response, &str> {
-        task::block_on(async move { self.call::<A, M>(actor_id, message).await })
+        task::block_on(async move { self.call_actor::<A, M>(actor_id, message).await })
     }
 
     /// Sends a message to a Service.
@@ -96,16 +96,22 @@ impl Acteur {
     ///
     /// If the Service is not loaded in Ram, this method will load them first
     /// by calling their "initialize" method.
-    pub async fn notify<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
+    pub async fn send_to_service<S: Service + Notify<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
         self.system_director.send_to_service::<S, M>(message).await;
     }
 
-    /// Same as `notify` method, but sync version.
-    pub fn notify_sync<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
-        task::block_on(async move { self.notify::<S, M>(message).await })
+    /// Same as `send_to_service` method, but sync version.
+    pub fn send_to_service_sync<S: Service + Notify<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
+        task::block_on(async move { self.send_to_service::<S, M>(message).await })
     }
 
-    /// As notify method, it sends a message to a Service but this one
+    /// As send_to_service method, it sends a message to a Service but this one
     /// wait for a response from the actor.
     ///
     /// This method will execute the [Serve::handle](./trait.Serve.html) implemented for
@@ -113,19 +119,19 @@ impl Acteur {
     ///
     /// If the Service is not loaded in Ram, this method will load them first
     /// by calling their "initialize" method.
-    pub async fn request<S: Service + Serve<M>, M: Debug + Send + 'static>(
+    pub async fn call_service<S: Service + Serve<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) -> Result<<S as Serve<M>>::Response, &str> {
-        self.system_director.call_to_service::<S, M>(message).await
+        self.system_director.call_service::<S, M>(message).await
     }
 
-    /// Same as `request` method, but sync version.
-    pub fn request_sync<S: Service + Serve<M>, M: Debug + Send + 'static>(
+    /// Same as `call_service` method, but sync version.
+    pub fn call_service_sync<S: Service + Serve<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) -> Result<<S as Serve<M>>::Response, &str> {
-        task::block_on(async move { self.request::<S, M>(message).await })
+        task::block_on(async move { self.call_service::<S, M>(message).await })
     }
 
     /// Send an stop message to all actors in the system.

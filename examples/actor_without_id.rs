@@ -45,7 +45,7 @@ fn main() {
 
     // As drawback, is that we need to write () each time.
     // That will be solved when services are implemented.
-    sys.send_sync::<Employee, SalaryChanged>((), SalaryChanged(55000));
+    sys.send_to_actor_sync::<Employee, SalaryChanged>((), SalaryChanged(55000));
 
     sys.wait_until_stopped();
 }
