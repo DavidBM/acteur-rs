@@ -1,4 +1,4 @@
-use acteur::{Acteur, Notify, Service, ServiceConfiguration, SystemAssistant};
+use acteur::{Acteur, Notify, Service, ServiceConfiguration, ServiceAssistant};
 
 #[derive(Debug)]
 struct EmployeeTaxesCalculator {
@@ -7,7 +7,7 @@ struct EmployeeTaxesCalculator {
 
 #[async_trait::async_trait]
 impl Service for EmployeeTaxesCalculator {
-    async fn initialize(system: &SystemAssistant<Self>) -> (Self, ServiceConfiguration) {
+    async fn initialize(system: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration) {
         let service = EmployeeTaxesCalculator { tax_rate: 0.21 };
         let service_conf = ServiceConfiguration::default();
 
@@ -27,7 +27,7 @@ struct EmployeeSalaryChange(f32);
 // Subscription uses the trait Notify, as normal message sends
 #[async_trait::async_trait]
 impl Notify<EmployeeSalaryChange> for EmployeeTaxesCalculator {
-    async fn handle(&self, message: EmployeeSalaryChange, _: &SystemAssistant<Self>) {
+    async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceAssistant<Self>) {
         println!("Message received! {:?}", message);
 
         // Calculate the tax rate and send it to however you want

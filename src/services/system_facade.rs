@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 /// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no-run
-/// use acteur::{Acteur, Service, Notify, ServiceConfiguration, SystemAssistant};
+/// use acteur::{Acteur, Service, Notify, ServiceConfiguration, ServiceAssistant};
 ///
 /// #[derive(Debug)]
 /// struct EmployeeTaxesCalculator {
@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 ///
 /// #[async_trait::async_trait]
 /// impl Service for EmployeeTaxesCalculator {
-///     async fn initialize(system: &SystemAssistant<Self>) -> (Self, ServiceConfiguration) {
+///     async fn initialize(system: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration) {
 ///         let service = EmployeeTaxesCalculator {
 ///             tax_rate: 0.21,
 ///         };
@@ -37,24 +37,24 @@ use std::marker::PhantomData;
 /// #[async_trait::async_trait]
 /// impl Notify<EmployeeSalaryChange> for EmployeeTaxesCalculator {
 ///
-///     async fn handle(&self, message: EmployeeSalaryChange, system: &SystemAssistant<Self>) {
+///     async fn handle(&self, message: EmployeeSalaryChange, system: &ServiceAssistant<Self>) {
 ///         system.stop_system();
 ///     }
 /// }
 /// ```
 ///
-pub struct SystemAssistant<S: Service> {
+pub struct ServiceAssistant<S: Service> {
     system_director: SystemDirector,
     broker: MessageBroker,
     phantom_system: PhantomData<S>,
 }
 
-impl<S: Service> SystemAssistant<S> {
+impl<S: Service> ServiceAssistant<S> {
     pub(crate) fn new(
         system_director: SystemDirector,
         broker: MessageBroker,
-    ) -> SystemAssistant<S> {
-        SystemAssistant {
+    ) -> ServiceAssistant<S> {
+        ServiceAssistant {
             system_director,
             broker,
             phantom_system: PhantomData,
@@ -121,9 +121,9 @@ impl<S: Service> SystemAssistant<S> {
     }
 }
 
-impl<S: Service> Clone for SystemAssistant<S> {
+impl<S: Service> Clone for ServiceAssistant<S> {
     fn clone(&self) -> Self {
-        SystemAssistant {
+        ServiceAssistant {
             system_director: self.system_director.clone(),
             broker: self.broker.clone(),
             phantom_system: PhantomData,
@@ -131,8 +131,8 @@ impl<S: Service> Clone for SystemAssistant<S> {
     }
 }
 
-impl<S: Service> Debug for SystemAssistant<S> {
+impl<S: Service> Debug for ServiceAssistant<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SystemAssistant Facade for Service")
+        write!(f, "ServiceAssistant Facade for Service")
     }
 }

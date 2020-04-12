@@ -39,15 +39,15 @@
 //!
 //! ### Actors
 //!
-//! Actors have an ID and will consume messages directed to the same Actor's ID sequentially. That means that if you have
-//! if you send 2 messages to the Actor User-32, they will be executed in order. On the other side, if you send a message
-//! to the Actor User-32 and other to the User-52 they will consume the messages concurrently.
+//! Actors have an ID and will consume messages directed to the same Actor's ID sequentially. That means that 
+//! if you send 2 messages to the Actor User-32, they will be handled in order. On the other side, if you send a message
+//! to the Actor User-32 and other to the User-52 the messages will be handled concurrently.
 //!
-//! That means, Actors instances keep the messages order for the same ID, but not between different IDs.
+//! That means, Actors instances keep messages order for the same ID, but not between different IDs.
 //!
 //! ### Services
 //!
-//! Services, on the other side, have no ID and they have concurrency. That means that you choose how many instances of
+//! Services, on the other side, have no ID and they are concurrent. That means that you choose how many instances of
 //! the Service there will be (Acteur provides a default). Services can or can't have an State, but if they have, they
 //! require to be Sync (aka Mutex<state>).
 //!
@@ -62,11 +62,14 @@
 //! Choose Services for Business Logic, Infrastructure, Adapters, etc (Storage, DB access, HTTP services,
 //! calculations of some sort that doesn't belong to any Actor, etc)
 //!
-//! ## Subscription or Pub/Sub (not yet implemented)
+//! ## Subscription or Pub/Sub
 //!
 //! Sometime we don't want to direct messages to destination, but to subscribe to a type and wait. Acteur models the
 //! Pub/Sub patter with Services. Actors in Acteur can't perform subscriptions as that would require the framework to
 //! know all possible IDs of all possible Actor instances in order to direct the message to the correct one.
+//!
+//! Additionally, if we allow subscriptions by Id, should we deallocate the actor when it is not used? That is why 
+//! subscriptions are limited to Services only.
 //!
 //! If you want to send messages to some Actors from a Subscription, you can create a Service that subscribes to a message
 //! and then figures out to what Actor IDs to send the message. For example, doing a query in the DB in order to get the
@@ -135,4 +138,4 @@ pub use actors::handle::{Receive, Respond};
 pub use facade::Acteur;
 pub use services::handle::{Notify, Serve};
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
-pub use services::system_facade::SystemAssistant;
+pub use services::system_facade::ServiceAssistant;

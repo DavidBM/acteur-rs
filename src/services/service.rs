@@ -1,4 +1,4 @@
-use crate::services::system_facade::SystemAssistant;
+use crate::services::system_facade::ServiceAssistant;
 use std::fmt::Debug;
 
 ///
@@ -7,7 +7,7 @@ use std::fmt::Debug;
 /// ServiceConfiguration struct.
 ///
 /// ```rust,no-run
-/// use acteur::{Acteur, Service, Serve, SystemAssistant, ServiceConfiguration};
+/// use acteur::{Acteur, Service, Serve, ServiceAssistant, ServiceConfiguration};
 ///
 /// #[derive(Debug)]
 /// struct EmployeeTaxesCalculator {
@@ -16,7 +16,7 @@ use std::fmt::Debug;
 ///
 /// #[async_trait::async_trait]
 /// impl Service for EmployeeTaxesCalculator {
-///     async fn initialize(system: &SystemAssistant<Self>) -> (Self, ServiceConfiguration) {
+///     async fn initialize(system: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration) {
 ///         let service = EmployeeTaxesCalculator {
 ///             tax_rate: 0.21,
 ///         };
@@ -34,7 +34,7 @@ use std::fmt::Debug;
 /// impl Serve<EmployeeSalaryChange> for EmployeeTaxesCalculator {
 ///     type Response = f32;
 ///
-///     async fn handle(&self, message: EmployeeSalaryChange, system: &SystemAssistant<Self>) -> f32 {
+///     async fn handle(&self, message: EmployeeSalaryChange, system: &ServiceAssistant<Self>) -> f32 {
 ///         self.tax_rate * message.0
 ///     }
 /// }
@@ -54,7 +54,7 @@ use std::fmt::Debug;
 ///
 #[async_trait::async_trait]
 pub trait Service: Sized + Send + Sync + Debug + 'static {
-    async fn initialize(system: &SystemAssistant<Self>) -> (Self, ServiceConfiguration);
+    async fn initialize(system: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration);
 }
 
 #[derive(Debug)]
