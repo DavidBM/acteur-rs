@@ -93,6 +93,10 @@ impl SystemDirector {
     pub(crate) fn get_statistics(&self) -> Vec<(TypeId, Vec<ActorReport>)> {
         self.actors_director.get_statistics()
     }
+
+    pub(crate) async fn publish<M: Send + Clone + 'static>(&self, message: M) {
+        self.services_director.publish(message).await
+    }
 }
 
 impl Clone for SystemDirector {

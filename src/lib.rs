@@ -30,8 +30,7 @@
 //! - ☑️ Services (statefull or stateless, like actors, without ID and processing messages concurrently)
 //! - ☑️ Automatic deallocation of unused actors
 //! - □ Actor deallocation configuration (based in RAM, Actor count or timeout)
-//! - □ Subscribe to message
-//! - □ Fan-out messages
+//! - ☑️ Subscribe to message
 //! - □ Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 //!
 //! ## Actors & Services
@@ -136,4 +135,4 @@ pub use actors::handle::{Receive, Respond};
 pub use facade::Acteur;
 pub use services::handle::{Notify, Serve};
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
-pub use services::system_facade::System;
+pub use services::system_facade::SystemAssistant;

@@ -47,8 +47,7 @@ Regarding the implementation:
 - [x] System statistics
 - [x] Automatic deallocation of unused actors (based in inactive time)
 - [ ] Actor deallocation configuration (based in RAM, Actor count or timeout)
-- [ ] Subscribe to message
-- [ ] Fan-out messages
+- [x] Subscribe to message
 - [x] RPC like messages between actors
 - [x] Services (statefull or stateless, like actors, without ID and processing messages concurrently)
 - [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())

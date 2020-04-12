@@ -206,7 +206,7 @@ async fn process_dispatch_command<'a, A: Actor>(
         actors_director.clone(),
         manager.clone(),
         actor_id.clone(),
-        innactivity_duration_until_end.clone(),
+        *innactivity_duration_until_end,
     );
 
     command.deliver(&mut actor).await;
@@ -252,9 +252,8 @@ impl<A: Actor> Manager for ActorsManager<A> {
     }
 
     fn remove_actor(&self, actor_id: Box<dyn Any + Send>) {
-        match actor_id.downcast::<A::Id>() {
-            Ok(actor_id) => ActorsManager::<A>::remove_actor(self, *actor_id),
-            Err(_) => (),
+        if let Ok(actor_id) = actor_id.downcast::<A::Id>() {
+            ActorsManager::<A>::remove_actor(self, *actor_id)
         }
     }
 }

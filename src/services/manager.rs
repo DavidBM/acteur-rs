@@ -1,7 +1,8 @@
+use crate::services::broker::MessageBroker;
 use crate::services::director::ServicesDirector;
 use crate::services::envelope::ServiceEnvelope;
 use crate::services::service::{Service, ServiceConcurrency};
-use crate::services::system_facade::System;
+use crate::services::system_facade::SystemAssistant;
 use crate::system_director::SystemDirector;
 use async_std::sync::Mutex;
 use async_std::{
@@ -20,8 +21,9 @@ use std::time::SystemTime;
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
     fn get_type_id(&self) -> TypeId;
-    async fn get_sender_as_any(&mut self) -> Box<dyn Any>;
+    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + Send)>;
     fn get_statistics(&self) -> ServiceReport;
+    fn clone(&self) -> Box<dyn Manager>;
 }
 
 pub struct ServiceReport {
@@ -47,8 +49,11 @@ impl<S: Service> ServiceManager<S> {
     pub async fn new(
         director: ServicesDirector,
         system_director: SystemDirector,
+        broker: MessageBroker,
     ) -> ServiceManager<S> {
-        let (service, service_conf) = S::initialize().await;
+        let system_facade = SystemAssistant::<S>::new(system_director.clone(), broker.clone());
+
+        let (service, service_conf) = S::initialize(&system_facade).await;
 
         let service = Arc::new(service);
 
@@ -84,33 +89,36 @@ impl<S: Service> ServiceManager<S> {
             service_loop(
                 receiver,
                 service.clone(),
-                manager.clone(),
+                Clone::clone(&manager),
                 director.clone(),
                 active_services.clone(),
                 system_director.clone(),
+                broker.clone(),
             );
         }
 
         manager
     }
 
-    async fn get_sender(&self) -> Sender<ServiceManagerCommand<S>> {
-        let current = {
-            let mut current = self.current.lock().await;
-
-            *current += 1;
-
-            if *current >= self.senders.len() {
-                *current = 0;
-            }
-
-            (*current).clone()
-        };
+    pub(crate) async fn get_sender(&self) -> Sender<ServiceManagerCommand<S>> {
+        let current = self.get_next_sender_index().await;
 
         match self.senders.get(current) {
             Some(sender) => sender.clone(),
             _ => unreachable!(),
         }
+    }
+
+    pub(crate) async fn get_next_sender_index(&self) -> usize {
+        let mut current = self.current.lock().await;
+
+        *current += 1;
+
+        if *current >= self.senders.len() {
+            *current = 0;
+        }
+
+        (*current).clone()
     }
 
     fn end(&self) {
@@ -130,10 +138,11 @@ fn service_loop<S: Service>(
     director: ServicesDirector,
     active_services: Arc<AtomicUsize>,
     system_director: SystemDirector,
+    broker: MessageBroker,
 ) {
     task::spawn(async move {
         task::spawn(async move {
-            let system_facade = System::new(system_director);
+            let system_facade = SystemAssistant::<S>::new(system_director, broker);
 
             loop {
                 if let Some(command) = receiver.recv().await {
@@ -213,7 +222,7 @@ fn service_loop<S: Service>(
 
 #[async_trait::async_trait]
 impl<S: Service> Manager for ServiceManager<S> {
-    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + 'static)> {
+    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + Send + 'static)> {
         Box::new(self.get_sender().await)
     }
     fn get_type_id(&self) -> TypeId {
@@ -229,6 +238,10 @@ impl<S: Service> Manager for ServiceManager<S> {
             last_message_on: SystemTime::now(),
             enqueued_messages: 10000,
         }
+    }
+
+    fn clone(&self) -> Box<dyn Manager> {
+        Box::new(Clone::clone(self))
     }
 }
 

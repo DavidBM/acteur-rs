@@ -1,5 +1,5 @@
 use crate::services::service::Service;
-use crate::services::system_facade::System;
+use crate::services::system_facade::SystemAssistant;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -12,7 +12,7 @@ use std::fmt::Debug;
 /// method from Assistant.
 ///
 /// ```rust,no-run
-/// use acteur::{Acteur, Service, Notify, System, ServiceConfiguration};
+/// use acteur::{Acteur, Service, Notify, SystemAssistant, ServiceConfiguration};
 /// use async_std::sync::Mutex;
 ///
 /// #[derive(Debug)]
@@ -24,7 +24,7 @@ use std::fmt::Debug;
 ///
 /// #[async_trait::async_trait]
 /// impl Service for EmployeeExpensesCalculator {
-///     async fn initialize() -> (Self, ServiceConfiguration) {
+///     async fn initialize(system: &SystemAssistant<Self>) -> (Self, ServiceConfiguration) {
 ///         let service = EmployeeExpensesCalculator {
 ///             employee_expenses: Mutex::new(0.0),
 ///         };
@@ -38,7 +38,7 @@ use std::fmt::Debug;
 ///
 /// #[async_trait::async_trait]
 /// impl Notify<EmployeeHired> for EmployeeExpensesCalculator {
-///     async fn handle(&self, message: EmployeeHired, _: &System) {
+///     async fn handle(&self, message: EmployeeHired, _: &SystemAssistant<Self>) {
 ///         *self.employee_expenses.lock().await += message.0;
 ///     }
 /// }
@@ -53,9 +53,9 @@ use std::fmt::Debug;
 #[async_trait]
 pub trait Notify<M: Debug>
 where
-    Self: Sized + Service,
+    Self: Service,
 {
-    async fn handle(&self, message: M, system: &System);
+    async fn handle(&self, message: M, system: &SystemAssistant<Self>);
 }
 
 /// This Trait allow Services to receive messages and, additionally, respond to them.
@@ -67,7 +67,7 @@ where
 /// method from Assistant
 ///
 /// ```rust,no-run
-/// use acteur::{Acteur, Service, Serve, ServiceConfiguration, System};
+/// use acteur::{Acteur, Service, Serve, ServiceConfiguration, SystemAssistant};
 ///
 /// #[derive(Debug)]
 /// struct EmployeeTaxesCalculator {
@@ -76,7 +76,7 @@ where
 ///
 /// #[async_trait::async_trait]
 /// impl Service for EmployeeTaxesCalculator {
-///     async fn initialize() -> (Self, ServiceConfiguration) {
+///     async fn initialize(system: &SystemAssistant<Self>) -> (Self, ServiceConfiguration) {
 ///         let service = EmployeeTaxesCalculator {
 ///             tax_rate: 0.21,
 ///         };
@@ -91,7 +91,7 @@ where
 /// #[async_trait::async_trait]
 /// impl Serve<EmployeeSalaryChange> for EmployeeTaxesCalculator {
 ///     type Response = f32;
-///     async fn handle(&self, message: EmployeeSalaryChange, _: &System) -> f32 {
+///     async fn handle(&self, message: EmployeeSalaryChange, _: &SystemAssistant<Self>) -> f32 {
 ///         self.tax_rate * message.0
 ///     }
 /// }
@@ -113,5 +113,5 @@ where
 pub trait Serve<M: Debug>: Sized + Service {
     type Response: Send;
 
-    async fn handle(&self, message: M, system: &System) -> Self::Response;
+    async fn handle(&self, message: M, system: &SystemAssistant<Self>) -> Self::Response;
 }

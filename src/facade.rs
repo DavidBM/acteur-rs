@@ -150,7 +150,7 @@ impl Acteur {
     }
 
     /// Same as `preload_service` but sync version
-    pub async fn preload_service_sync<S: Service>(&self) {
+    pub fn preload_service_sync<S: Service>(&self) {
         let system = self.system_director.clone();
         task::block_on(async move {
             system.preload_service::<S>().await;
@@ -166,6 +166,17 @@ impl Acteur {
 
     pub fn get_statistics(&self) -> Vec<(TypeId, Vec<ActorReport>)> {
         self.system_director.get_statistics()
+    }
+
+    /// Allows to publish messages for Services to receive. In order for the mesage
+    /// to be received by a service, the service must register itself for that message type.
+    pub async fn publish<M: Send + Clone + 'static>(&mut self, message: M) {
+        self.system_director.publish(message).await
+    }
+
+    /// Same as publish method, but sync version
+    pub fn publish_sync<M: Send + Clone + 'static>(&mut self, message: M) {
+        task::block_on(async { self.system_director.publish(message).await });
     }
 }
 
