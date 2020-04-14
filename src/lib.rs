@@ -164,7 +164,7 @@
 //! 
 //! let acteur = Acteur::new();
 //! 
-//! // You can clone and 
+//! // You can clone and send it to another thread/struct
 //! let acteur2 = acteur.clone();
 //! 
 //! ```
