@@ -15,7 +15,7 @@
   </a>
   <!-- docs.rs docs -->
   <a href="https://docs.rs/acteur">
-    <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+    Documentation: <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
       alt="docs.rs docs" />
   </a>
 </div>
@@ -25,32 +25,37 @@
 
 Acteur uses async_std under the hood. This actor system work under the following premises:
 
- - **Simplicity**: The API should be small, simple and intuitive
- - **Speed**: The system should be fast and use all available CPU cores
- - **Documented**: Everything must be documented with exhaustive examples
+This actor system work under the following premises:
+ - **Simple**: The API should be small, simple and intuitive. No surprises.
+ - **Fast**: The system should be fast and use all available CPU cores.
+ - **Documented**: Everything must be documented with exhaustive examples.
 
-Regarding the implementation:
+### Regarding the implementation:
 
- - Actors have an ID which type is defined by the user for each Actor type
- - Messages are routed to an Actor and an ID
- - Actor life-cycle is automatically handled by the framework
- - Actors are automatically de/allocated depending of their usage
- - Messages for the same Actor & ID are ordered. Everything else is executed concurrently.
+ - Acteur is **asynchronous** and uses `async_std` under the hood. (Even for mutexes)
+ - Actors have an *ID* which type is defined by the developer.
+ - Messages are routed to an *Actor* and an *ID.
+ - Actor life-cycle is *automatically* managed by the framework.
+ - Messages for the same Actor & ID are *sequential*. Everything else is executed **concurrently**.
+ - Services are provided for other concurrency forms.
+ - Services **don't** have ID and are concurrent.
+ - Services can **subscribe** to messages and everyone can **publish** messages.
+ - Acteur is **global**, only one instance can exist. 
 
-## State of the implementation
+### State of the implementation
 
-- [x] Actor is activated on first message
-- [x] Actor can send messages to other actors
-- [x] System can send messages to any actor
-- [x] Actor self stop
-- [x] Stop waits for all actors to consume all messages
-- [x] System statistics
-- [x] Automatic deallocation of unused actors (based in inactive time)
-- [ ] Actor deallocation configuration (based in RAM, Actor count or timeout)
-- [x] Subscribe to message
-- [x] RPC like messages between actors
-- [x] Services (statefull or stateless, like actors, without ID and processing messages concurrently)
-- [ ] Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
+The overall feature set is complete. Acteur will continue improving 
+and adding improvements. As for now, this framework is actively supported/developed.
+
+My main focus of work now is in the ergonomics.
+
+- ☑️ Actor / services is activated on first message
+- ☑️ Actor can send messages to other actors / services
+- ☑️ System can send messages to any actor / service
+- ☑️ Actors / Services can optimally, respond to messages
+- ☑️ Services (statefull or stateless, like actors, without ID and concurrent)
+- ☑️ Automatic deallocation of unused actors (after 5 minutes without messages)
+- ☑️ Services can subscribe to messages
 
 ## Examples
 
