@@ -1,4 +1,17 @@
-TODO: Document Services
+# State of the implementation
+
+- ☑️ Actor is activated on first message
+- ☑️ Actor can send messages to other actors
+- ☑️ System can send messages to any actor
+- ☑️ Actor self stop
+- ☑️ Stop waits for all actors to consume all messages
+- ☑️ System statistics
+- ☑️ RPC like messages between actors
+- ☑️ Services (statefull or stateless, like actors, without ID and processing messages concurrently)
+- ☑️ Automatic deallocation of unused actors
+- ☑️ Subscribe to message
+- □ Actor deallocation configuration (based in RAM, Actor count or timeout)
+- □ Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 
 # Notes
 
