@@ -15,7 +15,7 @@
   </a>
   <!-- docs.rs docs -->
   <a href="https://docs.rs/acteur">
-    Documentation: <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+    <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
       alt="docs.rs docs" />
   </a>
 </div>
@@ -23,7 +23,7 @@
 
 ## Main Features
 
-Acteur uses async_std under the hood. This actor system work under the following premises:
+Acteur uses async_std under the hood. You can find the all the information in the [documentation](https://docs.rs/acteur).
 
 This actor system work under the following premises:
  - **Simple**: The API should be small, simple and intuitive. No surprises.
