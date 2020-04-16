@@ -62,21 +62,20 @@ My main focus of work now is in the ergonomics.
 Simple example
 
 ```rust
-use acteur::{Acteur, Actor, Assistant, Receive};
+use acteur::{Actor, Receive, Assistant, Acteur};
 use async_trait::async_trait;
 
 #[derive(Debug)]
 struct Employee {
-    salary: u32,
+    salary: u32
 }
 
 #[async_trait]
 impl Actor for Employee {
     type Id = u32;
-
-    async fn activate(_: Self::Id) -> Self {
+    async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
         Employee {
-            salary: 0, //Load from DB or set a default,
+            salary: 0 // Load from DB or set a default,
         }
     }
 }
@@ -92,12 +91,13 @@ impl Receive<SalaryChanged> for Employee {
 }
 
 fn main() {
-    let sys = Acteur::new();
+  let sys = Acteur::new();
 
-    sys.send_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+  sys.send_to_actor_sync::<Employee, _>(42, SalaryChanged(55000));
 
-    sys.wait_until_stopped();
+  sys.wait_until_stopped();
 }
+
 ```
 
 You can find more examples in [the examples folder](./examples).
