@@ -1,6 +1,6 @@
 [package]
 name = "acteur"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["David Bonet <webbonet@gmail.com>"]
 edition = "2018"
 description = "A safe actor system that just works. Simple, robust, fast, documented."
