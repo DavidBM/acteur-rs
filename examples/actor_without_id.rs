@@ -23,7 +23,7 @@ impl Actor for Employee {
     // We use the type () as id-less id. Therefore, only one actor will exist
     type Id = ();
 
-    async fn activate(_: Self::Id) -> Self {
+    async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
         Employee {
             salary: 0, //Load from DB or set a default,
         }

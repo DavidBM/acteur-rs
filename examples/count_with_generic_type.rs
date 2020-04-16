@@ -43,7 +43,7 @@ struct TestActor<T> {
 impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug> Actor for TestActor<T> {
     type Id = T;
 
-    async fn activate(id: Self::Id) -> Self {
+    async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
         //
         TestActor {
             id,

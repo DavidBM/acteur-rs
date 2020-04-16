@@ -123,7 +123,7 @@ fn actor_loop<A: Actor>(
     innactivity_duration_until_end: Duration,
 ) {
     task::spawn(async move {
-        let mut actor = A::activate(id.clone()).await;
+        let mut actor = A::activate(id.clone(), &assistant).await;
 
         task::spawn(async move {
             loop {

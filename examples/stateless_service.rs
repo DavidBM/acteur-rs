@@ -1,4 +1,4 @@
-use acteur::{Acteur, Serve, Service, ServiceConfiguration, ServiceAssistant};
+use acteur::{Acteur, Serve, Service, ServiceAssistant, ServiceConfiguration};
 
 #[derive(Debug)]
 struct EmployeeTaxesCalculator {

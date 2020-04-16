@@ -11,7 +11,7 @@ struct Employee {
 impl Actor for Employee {
     type Id = u32;
 
-    async fn activate(id: Self::Id) -> Self {
+    async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
         println!("Employee {:?} activated!", id);
         Employee {
             id,

@@ -12,6 +12,7 @@
 - ☑️ Subscribe to message
 - □ Actor deallocation configuration (based in RAM, Actor count or timeout)
 - □ Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
+- □ Add service with "unlimited" concurrency for cases where DB queries need to be done or cases where they are just the middleman between external world and actors.
 
 # Notes
 

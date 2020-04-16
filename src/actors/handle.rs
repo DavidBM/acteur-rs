@@ -3,13 +3,14 @@ use crate::Assistant;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
-/// This Trait allow Actors to receive messages.
+/// This Trait allow Actors to receive messages. This is the most efficient way to process messages as it doesn't
+/// require to respond the message.
 ///
 /// If you want to respond to messages, use the [Respond trait](./trait.Respond.html).
 ///
 /// This trait is compatible with [Respond trait](./trait.Respond.html) as you can implement, for the same message,
-/// both traits. This trait will be executed when using the "send" or "send_sync" method from System or the "send"
-/// method from Assistant.
+/// both traits. This trait will be executed when using the "send_to_actor" or "send_to_actor_sync" method from System 
+/// or the "send_to_actor" method from Assistant.
 ///
 /// ```rust,no_run
 /// use async_trait::async_trait;
@@ -24,7 +25,7 @@ use std::fmt::Debug;
 /// # impl Actor for Employee {
 /// #     type Id = u32;
 /// #
-/// #     async fn activate(id: Self::Id) -> Self {
+/// #     async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
 /// #         println!("Employee {:?} activated!", id);
 /// #         Employee {
 /// #             id,
@@ -76,16 +77,16 @@ where
 /// This trait is like the [Receive trait](./trait.Receive.html) but additionally allows responding to messages
 ///
 /// This trait is compatible with [Receive trait](./trait.Receive.html) as you can implement, for the same message,
-/// both traits. This trait will be executed when using the "call" or "call_sync" method from System or the "call"
-/// method from Assistant.
+/// both traits. This trait will be executed when using the "call_actor" or "call_actor_sync" method from System or
+/// the "call_actor" method from Assistant.
 ///
 /// ## Note about concurrency and performance
 ///
-/// If there is no reason to respond to a message, prefer to use the Receice trait, as this may delay you Actors or
-/// even deadlock them. For example:
+/// If there is no reason to respond to a message, prefer to use the [Receive trait](./trait.Receive.html) trait, as 
+/// this may delay you Actors or even deadlock them. For example:
 ///
-///  - Actor A-51 calls Actor B-32
-///  - Actor B-32 calls Actor A-51
+///  1. Actor A-51 calls Actor B-32
+///  2. Actor B-32 calls Actor A-51
 ///
 /// As Actor A-51 is blocked waiting for B-32, this will keep waiting forever.
 ///
@@ -106,7 +107,7 @@ where
 /// # impl Actor for Employee {
 /// #     type Id = u32;
 /// #
-/// #     async fn activate(id: Self::Id) -> Self {
+/// #     async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
 /// #         println!("Employee {:?} activated!", id);
 /// #         Employee {
 /// #             id,

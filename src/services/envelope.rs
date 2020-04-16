@@ -40,7 +40,11 @@ impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
 impl<S: Service + Notify<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
     type Service = S;
 
-    async fn dispatch(&mut self, service: &Self::Service, system: &ServiceAssistant<Self::Service>) {
+    async fn dispatch(
+        &mut self,
+        service: &Self::Service,
+        system: &ServiceAssistant<Self::Service>,
+    ) {
         Letter::<S, M>::dispatch_service(self, service, system).await;
     }
 }

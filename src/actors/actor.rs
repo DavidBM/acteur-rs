@@ -1,3 +1,4 @@
+use crate::actors::assistant::Assistant;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -28,7 +29,7 @@ use std::hash::Hash;
 ///
 ///     // You can use or not the actor Id, still, it will be kept by the framework.
 ///     // This method allows you to acquire any resource you need and save it.
-///     async fn activate(id: Self::Id) -> Self {
+///     async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
 ///         println!("Employee {:?} activated!", id);
 ///         Employee {
 ///             id,
@@ -44,14 +45,14 @@ use std::hash::Hash;
 /// ```
 ///
 #[async_trait]
-pub trait Actor: Debug + Send + Sync + 'static {
+pub trait Actor: Sized + Debug + Send + Sync + 'static {
     /// The Id type for the actor.
     /// This Id will be used to identify the actor internally.
     type Id: Eq + Hash + Send + Sync + Clone + Debug;
 
     /// This method will be called automatically when the actor is activated.
     /// Normally, actors are activated when the first message is received.
-    async fn activate(id: Self::Id) -> Self;
+    async fn activate(id: Self::Id, assistant: &Assistant<Self>) -> Self;
 
     /// This method will be called when the framework decided to unload the actor.
     /// The concrete algorithms to decide that can change in the future.

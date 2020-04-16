@@ -10,7 +10,7 @@ struct Employee {
 impl Actor for Employee {
     type Id = u32;
 
-    async fn activate(_: Self::Id) -> Self {
+    async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
         Employee {
             salary: 0, //Load from DB or set a default,
         }
