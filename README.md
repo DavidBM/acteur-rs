@@ -23,7 +23,7 @@
 
 ## Main Features
 
-Acteur uses async_std under the hood. You can find the all the information in the [documentation](https://docs.rs/acteur).
+Acteur uses [`async_std`](https://github.com/async-rs/async-std) under the hood. You can find the all the information in the [documentation](https://docs.rs/acteur).
 
 This actor system work under the following premises:
  - **Simple**: The API should be small, simple and intuitive. No surprises.

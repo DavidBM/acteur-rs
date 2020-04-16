@@ -2,10 +2,11 @@
 //!
 //! An actor system written in Rust that just works. Simple, robust, fast, documented.
 //!
-//! ## Overall features of Acteur
+//! ## Main features of Acteur
 //!
+//! Acteur uses [`async_std`](https://github.com/async-rs/async-std) under the hood. You can find the all the information in the [documentation](https://docs.rs/acteur).
+//! 
 //! This actor system work under the following premises:
-//!
 //!  - **Simple**: The API should be small, simple and intuitive. No surprises.
 //!  - **Fast**: The system should be fast and use all available CPU cores.
 //!  - **Documented**: Everything must be documented with exhaustive examples.
