@@ -13,7 +13,7 @@ use std::fmt::Debug;
 /// method from ActorAssistant.
 ///
 /// ```rust,no-run
-/// use acteur::{Acteur, Service, Notify, ServiceActorAssistant, ServiceConfiguration};
+/// use acteur::{Acteur, Service, Listen, ServiceActorAssistant, ServiceConfiguration};
 /// use async_std::sync::Mutex;
 ///
 /// #[derive(Debug)]
@@ -38,7 +38,7 @@ use std::fmt::Debug;
 /// struct EmployeeHired(f32);
 ///
 /// #[async_trait::async_trait]
-/// impl Notify<EmployeeHired> for EmployeeExpensesCalculator {
+/// impl Listen<EmployeeHired> for EmployeeExpensesCalculator {
 ///     async fn handle(&self, message: EmployeeHired, _: &ServiceActorAssistant<Self>) {
 ///         *self.employee_expenses.lock().await += message.0;
 ///     }
@@ -52,7 +52,7 @@ use std::fmt::Debug;
 /// ```
 ///
 #[async_trait]
-pub trait Notify<M: Debug>
+pub trait Listen<M: Debug>
 where
     Self: Service,
 {
@@ -61,9 +61,9 @@ where
 
 /// This Trait allow Services to receive messages and, additionally, respond to them.
 ///
-/// If you don't need to respond messages, use the [Notify trait](./trait.Notify.html).
+/// If you don't need to respond messages, use the [Listen trait](./trait.Listen.html).
 ///
-/// This trait is compatible with [Notify trait](./trait.Notify.html) as you can implement, for the same message,
+/// This trait is compatible with [Listen trait](./trait.Listen.html) as you can implement, for the same message,
 /// both traits. This trait will be executed when using the "notify" or "notify_sync" method from Acteur or the "notify"
 /// method from ActorAssistant
 /// 

@@ -1,5 +1,5 @@
 use crate::actors::director::ActorsDirector;
-use crate::services::handle::{Notify, Serve};
+use crate::services::handle::{Listen, Serve};
 use crate::services::service::Service;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
@@ -116,7 +116,7 @@ impl<A: Actor> ActorAssistant<A> {
 
     /// Sends a message to a Service.
     /// If the Service is not loaded, it will load the service before, calling its method `initialize`
-    pub async fn send_to_service<S: Service + Notify<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_service<S: Service + Listen<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) {

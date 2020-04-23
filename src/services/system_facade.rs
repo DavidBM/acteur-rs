@@ -1,5 +1,5 @@
 use crate::services::broker::MessageBroker;
-use crate::services::handle::{Notify, Serve};
+use crate::services::handle::{Listen, Serve};
 use crate::services::service::Service;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 /// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no-run
-/// use acteur::{Acteur, Service, Notify, ServiceConfiguration, ServiceActorAssistant};
+/// use acteur::{Acteur, Service, Listen, ServiceConfiguration, ServiceActorAssistant};
 ///
 /// #[derive(Debug)]
 /// struct EmployeeTaxesCalculator {
@@ -35,7 +35,7 @@ use std::marker::PhantomData;
 /// struct EmployeeSalaryChange(u32);
 ///
 /// #[async_trait::async_trait]
-/// impl Notify<EmployeeSalaryChange> for EmployeeTaxesCalculator {
+/// impl Listen<EmployeeSalaryChange> for EmployeeTaxesCalculator {
 ///
 ///     async fn handle(&self, message: EmployeeSalaryChange, system: &ServiceActorAssistant<Self>) {
 ///         system.stop_system();
@@ -87,7 +87,7 @@ impl<S: Service> ServiceActorAssistant<S> {
 
     /// Sends a message to a Service.
     /// If the Service is not loaded, it will load the service before, calling its method `initialize`
-    pub async fn send_to_service<S1: Service + Notify<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_service<S1: Service + Listen<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) {
@@ -115,7 +115,7 @@ impl<S: Service> ServiceActorAssistant<S> {
 
     pub async fn subscribe<M: Sync + Send + Debug + 'static>(&self)
     where
-        S: Service + Notify<M>,
+        S: Service + Listen<M>,
     {
         self.broker.register::<S, M>();
     }

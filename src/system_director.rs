@@ -4,7 +4,7 @@ use crate::actors::handle::Receive;
 use crate::actors::handle::Respond;
 use crate::actors::proxy::ActorReport;
 use crate::services::director::ServicesDirector;
-use crate::services::handle::Notify;
+use crate::services::handle::Listen;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
 use async_std::{sync::Arc, task::block_on};
@@ -61,7 +61,7 @@ impl SystemDirector {
         self.actors_director.call::<A, M>(actor_id, message).await
     }
 
-    pub async fn send_to_service<S: Service + Notify<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_service<S: Service + Listen<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) {

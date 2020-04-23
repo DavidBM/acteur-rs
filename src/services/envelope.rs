@@ -1,5 +1,5 @@
 use crate::actors::envelope::Letter;
-use crate::services::handle::Notify;
+use crate::services::handle::Listen;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
 use crate::services::system_facade::ServiceActorAssistant;
@@ -16,10 +16,10 @@ pub(crate) trait ServiceEnvelope: Send + Debug {
 }
 
 /// For send without response we can use the normal Letter struct
-impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
+impl<S: Service + Listen<M>, M: Debug> Letter<S, M> {
     pub fn new_for_service(message: M) -> Self
     where
-        S: Notify<M>,
+        S: Listen<M>,
         Self: ServiceEnvelope,
     {
         Letter {
@@ -30,14 +30,14 @@ impl<S: Service + Notify<M>, M: Debug> Letter<S, M> {
 
     pub async fn dispatch_service(&mut self, service: &S, system: &ServiceActorAssistant<S>) {
         if let Some(message) = self.message.take() {
-            <S as Notify<M>>::handle(service, message, system).await;
+            <S as Listen<M>>::handle(service, message, system).await;
         }
     }
 }
 
 /// For send without response we can use the normal Letter struct
 #[async_trait::async_trait]
-impl<S: Service + Notify<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
+impl<S: Service + Listen<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
     type Service = S;
 
     async fn dispatch(

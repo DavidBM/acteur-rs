@@ -1,5 +1,5 @@
 use crate::actors::proxy::ActorReport;
-use crate::services::handle::{Notify, Serve};
+use crate::services::handle::{Listen, Serve};
 use crate::services::service::Service;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
@@ -91,12 +91,12 @@ impl Acteur {
 
     /// Sends a message to a Service.
     ///
-    /// This method will execute the [Notify::handle](./trait.Notify.html) implemented for
+    /// This method will execute the [Listen::handle](./trait.Listen.html) implemented for
     /// that Message and Service.
     ///
     /// If the Service is not loaded in Ram, this method will load them first
     /// by calling their "initialize" method.
-    pub async fn send_to_service<S: Service + Notify<M>, M: Debug + Send + 'static>(
+    pub async fn send_to_service<S: Service + Listen<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) {
@@ -104,7 +104,7 @@ impl Acteur {
     }
 
     /// Same as `send_to_service` method, but sync version.
-    pub fn send_to_service_sync<S: Service + Notify<M>, M: Debug + Send + 'static>(
+    pub fn send_to_service_sync<S: Service + Listen<M>, M: Debug + Send + 'static>(
         &self,
         message: M,
     ) {

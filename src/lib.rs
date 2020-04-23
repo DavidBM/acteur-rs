@@ -58,7 +58,7 @@
 //!
 //! For Services you have other two traits.
 //!
-//! - [Notify](./trait.Notify.html): Receives a message without responding to it. The most efficient way to handle messages.
+//! - [Listen](./trait.Listen.html): Receives a message without responding to it. The most efficient way to handle messages.
 //! - [Serve](./trait.Serve.html): Receives a message and allows to respond to it. Forces to sender to await until the actor respond.
 //!
 //! ## Actors & Services
@@ -207,6 +207,6 @@ pub use actors::actor::Actor;
 pub use actors::assistant::ActorAssistant;
 pub use actors::handle::{Receive, Respond};
 pub use facade::Acteur;
-pub use services::handle::{Notify, Serve};
+pub use services::handle::{Listen, Serve};
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
 pub use services::system_facade::ServiceActorAssistant;

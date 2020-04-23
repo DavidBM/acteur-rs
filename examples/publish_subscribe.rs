@@ -1,4 +1,4 @@
-use acteur::{Acteur, Notify, Service, ServiceActorAssistant, ServiceConfiguration};
+use acteur::{Acteur, Listen, Service, ServiceActorAssistant, ServiceConfiguration};
 
 #[derive(Debug)]
 struct EmployeeTaxesCalculator {
@@ -24,9 +24,9 @@ impl Service for EmployeeTaxesCalculator {
 #[derive(Debug, Clone)]
 struct EmployeeSalaryChange(f32);
 
-// Subscription uses the trait Notify, as normal message sends
+// Subscription uses the trait Listen, as normal message sends
 #[async_trait::async_trait]
-impl Notify<EmployeeSalaryChange> for EmployeeTaxesCalculator {
+impl Listen<EmployeeSalaryChange> for EmployeeTaxesCalculator {
     async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceActorAssistant<Self>) {
         println!("Message received! {:?}", message);
 

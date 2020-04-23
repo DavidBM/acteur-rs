@@ -1,7 +1,7 @@
 use crate::actors::envelope::Letter;
 use crate::services::broker::MessageBroker;
 use crate::services::envelope::ServiceLetterWithResponders;
-use crate::services::handle::Notify;
+use crate::services::handle::Listen;
 use crate::services::handle::Serve;
 use crate::services::manager::{Manager, ServiceManager, ServiceManagerCommand};
 use crate::system_director::SystemDirector;
@@ -87,7 +87,7 @@ impl ServicesDirector {
         self.get_or_create_manager_sender::<S>().await;
     }
 
-    pub(crate) async fn send<S: Service + Notify<M>, M: Debug + Send + 'static>(&self, message: M) {
+    pub(crate) async fn send<S: Service + Listen<M>, M: Debug + Send + 'static>(&self, message: M) {
         self.get_or_create_manager_sender::<S>()
             .await
             .send(ServiceManagerCommand::Dispatch(Box::new(

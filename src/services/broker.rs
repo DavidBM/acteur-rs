@@ -1,5 +1,5 @@
 use crate::services::director::ServicesDirector;
-use crate::services::handle::Notify;
+use crate::services::handle::Listen;
 use crate::services::service::Service;
 use async_std::sync::Arc;
 use dashmap::{mapref::entry::Entry, DashMap};
@@ -22,7 +22,7 @@ impl MessageBroker {
         }
     }
 
-    pub(crate) fn register<S: Service + Notify<M>, M: Sync + Send + Debug + 'static>(&self) {
+    pub(crate) fn register<S: Service + Listen<M>, M: Sync + Send + Debug + 'static>(&self) {
         let type_id = TypeId::of::<M>();
 
         let managers_entry = self.managers.entry(type_id);
@@ -57,12 +57,12 @@ trait ServiceManagerPublish: Send + Sync {
 }
 
 #[derive(Debug)]
-struct ServiceManagerWrapper<S: Service + Notify<M>, M: Debug> {
+struct ServiceManagerWrapper<S: Service + Listen<M>, M: Debug> {
     phantom_service: PhantomData<S>,
     phantom_message: PhantomData<M>,
 }
 
-impl<S: Service + Notify<M>, M: Debug + Send + 'static> ServiceManagerWrapper<S, M> {
+impl<S: Service + Listen<M>, M: Debug + Send + 'static> ServiceManagerWrapper<S, M> {
     fn new() -> ServiceManagerWrapper<S, M> {
         ServiceManagerWrapper {
             phantom_service: PhantomData,
@@ -76,7 +76,7 @@ impl<S: Service + Notify<M>, M: Debug + Send + 'static> ServiceManagerWrapper<S,
 }
 
 #[async_trait::async_trait]
-impl<S: Service + Notify<M>, M: Debug + Send + Sync + 'static> ServiceManagerPublish
+impl<S: Service + Listen<M>, M: Debug + Send + Sync + 'static> ServiceManagerPublish
     for ServiceManagerWrapper<S, M>
 {
     async fn send(&mut self, message: Box<(dyn Any + Send)>, system_director: &ServicesDirector) {
