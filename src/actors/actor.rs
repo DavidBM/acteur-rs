@@ -1,4 +1,4 @@
-use crate::actors::assistant::Assistant;
+use crate::actors::assistant::ActorAssistant;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -12,7 +12,7 @@ use std::hash::Hash;
 /// The constrains for such Id are `Eq + Hash + Send + Sync + Clone + Debug`
 ///
 /// ```rust,no_run
-/// use acteur::{Actor, Assistant};
+/// use acteur::{Actor, ActorAssistant};
 /// use async_trait::async_trait;
 ///
 /// // You can use any normal struct as an actor. It will contain the actor state. No Arc/Mutex
@@ -29,7 +29,7 @@ use std::hash::Hash;
 ///
 ///     // You can use or not the actor Id, still, it will be kept by the framework.
 ///     // This method allows you to acquire any resource you need and save it.
-///     async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
+///     async fn activate(id: Self::Id, _: &ActorAssistant<Self>) -> Self {
 ///         println!("Employee {:?} activated!", id);
 ///         Employee {
 ///             id,
@@ -52,7 +52,7 @@ pub trait Actor: Sized + Debug + Send + Sync + 'static {
 
     /// This method will be called automatically when the actor is activated.
     /// Normally, actors are activated when the first message is received.
-    async fn activate(id: Self::Id, assistant: &Assistant<Self>) -> Self;
+    async fn activate(id: Self::Id, assistant: &ActorAssistant<Self>) -> Self;
 
     /// This method will be called when the framework decided to unload the actor.
     /// The concrete algorithms to decide that can change in the future.

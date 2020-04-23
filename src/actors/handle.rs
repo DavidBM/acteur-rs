@@ -1,5 +1,5 @@
 use crate::Actor;
-use crate::Assistant;
+use crate::ActorAssistant;
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -10,7 +10,7 @@ use std::fmt::Debug;
 ///
 /// This trait is compatible with [Respond trait](./trait.Respond.html) as you can implement, for the same message,
 /// both traits. This trait will be executed when using the "send_to_actor" or "send_to_actor_sync" method from System 
-/// or the "send_to_actor" method from Assistant.
+/// or the "send_to_actor" method from ActorAssistant.
 ///
 /// ```rust,no_run
 /// use async_trait::async_trait;
@@ -25,7 +25,7 @@ use std::fmt::Debug;
 /// # impl Actor for Employee {
 /// #     type Id = u32;
 /// #
-/// #     async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
+/// #     async fn activate(id: Self::Id, _: &ActorAssistant<Self>) -> Self {
 /// #         println!("Employee {:?} activated!", id);
 /// #         Employee {
 /// #             id,
@@ -37,14 +37,14 @@ use std::fmt::Debug;
 /// #         println!("Employee {:?} deactivated!", self.id);
 /// #     }
 /// # }
-/// use acteur::{Assistant, Receive, Acteur};
+/// use acteur::{ActorAssistant, Receive, Acteur};
 ///
 /// #[derive(Debug)]
 /// struct SalaryChanged(u32);
 ///
 /// #[async_trait]
 /// impl Receive<SalaryChanged> for Employee {
-///     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
+///     async fn handle(&mut self, message: SalaryChanged, _: &ActorAssistant<Employee>) {
 ///         self.salary = message.0;
 ///     }
 /// }
@@ -66,10 +66,10 @@ where
     Self: Sized + Actor,
 {
     /// This method is called each time a message is received.
-    /// You can use the [Assistant](./struct.Assistant.html) to send messages from actors,
+    /// You can use the [ActorAssistant](./struct.ActorAssistant.html) to send messages from actors,
     /// [`System`](./struct.System.html) to send messages from services and
     /// [`Acteur`](./struct.System.html) to send messages from outside the framework
-    async fn handle(&mut self, message: M, assistant: &Assistant<Self>);
+    async fn handle(&mut self, message: M, assistant: &ActorAssistant<Self>);
 }
 
 /// This Trait allow Actors to receive messages and, additionally, respond to them.
@@ -78,7 +78,7 @@ where
 ///
 /// This trait is compatible with [Receive trait](./trait.Receive.html) as you can implement, for the same message,
 /// both traits. This trait will be executed when using the "call_actor" or "call_actor_sync" method from System or
-/// the "call_actor" method from Assistant.
+/// the "call_actor" method from ActorAssistant.
 ///
 /// ## Note about concurrency and performance
 ///
@@ -107,7 +107,7 @@ where
 /// # impl Actor for Employee {
 /// #     type Id = u32;
 /// #
-/// #     async fn activate(id: Self::Id, _: &Assistant<Self>) -> Self {
+/// #     async fn activate(id: Self::Id, _: &ActorAssistant<Self>) -> Self {
 /// #         println!("Employee {:?} activated!", id);
 /// #         Employee {
 /// #             id,
@@ -119,7 +119,7 @@ where
 /// #         println!("Employee {:?} deactivated!", self.id);
 /// #     }
 /// # }
-/// use acteur::{Assistant, Respond, Acteur};
+/// use acteur::{ActorAssistant, Respond, Acteur};
 ///
 /// #[derive(Debug)]
 /// struct SalaryChanged(u32);
@@ -127,7 +127,7 @@ where
 /// #[async_trait]
 /// impl Respond<SalaryChanged> for Employee {
 ///     type Response = String;
-///     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) -> String {
+///     async fn handle(&mut self, message: SalaryChanged, _: &ActorAssistant<Employee>) -> String {
 ///         self.salary = message.0;
 ///         String::from("Thanks!")
 ///     }
@@ -145,15 +145,15 @@ where
 ///
 /// ```
 ///
-/// You can use the [Assistant](./struct.Assistant.html) in order to interact with other actors and the system.
+/// You can use the [ActorAssistant](./struct.ActorAssistant.html) in order to interact with other actors and the system.
 ///
 ///
 #[async_trait]
 pub trait Respond<M: Debug>: Sized + Actor {
     type Response: Send;
     /// This method is called each time a message is received.
-    /// You can use the [Assistant](./struct.Assistant.html) to send messages from actors,
+    /// You can use the [ActorAssistant](./struct.ActorAssistant.html) to send messages from actors,
     /// [`System`](./struct.System.html) to send messages from services and
     /// [`Acteur`](./struct.System.html) to send messages from outside the framework
-    async fn handle(&mut self, message: M, assistant: &Assistant<Self>) -> Self::Response;
+    async fn handle(&mut self, message: M, assistant: &ActorAssistant<Self>) -> Self::Response;
 }

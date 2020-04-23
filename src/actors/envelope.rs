@@ -1,6 +1,6 @@
 use crate::actors::handle::Respond;
 use crate::actors::proxy::ActorProxy;
-use crate::{Actor, Assistant, Receive};
+use crate::{Actor, ActorAssistant, Receive};
 use async_std::sync::Sender;
 use async_trait::async_trait;
 use std::fmt::Debug;
@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 pub(crate) trait Envelope: Send + Debug {
     type Actor: Actor;
 
-    async fn dispatch(&mut self, actor: &mut Self::Actor, assistant: &Assistant<Self::Actor>);
+    async fn dispatch(&mut self, actor: &mut Self::Actor, assistant: &ActorAssistant<Self::Actor>);
 }
 
 /// This struct implements `Envelope` and stores the message and the Actors type. This is
@@ -46,7 +46,7 @@ impl<A: Receive<M> + Actor, M: Debug> Letter<A, M> {
         }
     }
 
-    pub async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
+    pub async fn dispatch(&mut self, actor: &mut A, assistant: &ActorAssistant<A>) {
         if let Some(message) = self.message.take() {
             <A as Receive<M>>::handle(actor, message, assistant).await;
         }
@@ -57,7 +57,7 @@ impl<A: Receive<M> + Actor, M: Debug> Letter<A, M> {
 impl<A: Actor + Receive<M>, M: Send + Debug> Envelope for Letter<A, M> {
     type Actor = A;
 
-    async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
+    async fn dispatch(&mut self, actor: &mut A, assistant: &ActorAssistant<A>) {
         Letter::<A, M>::dispatch(self, actor, assistant).await
     }
 }
@@ -138,7 +138,7 @@ impl<A: Respond<M> + Actor, M: Debug> LetterWithResponder<A, M> {
         }
     }
 
-    pub async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
+    pub async fn dispatch(&mut self, actor: &mut A, assistant: &ActorAssistant<A>) {
         if let Some(message) = self.message.take() {
             let response = <A as Respond<M>>::handle(actor, message, assistant).await;
             self.responder.send(response).await;
@@ -150,7 +150,7 @@ impl<A: Respond<M> + Actor, M: Debug> LetterWithResponder<A, M> {
 impl<A: Actor + Respond<M>, M: Send + Debug> Envelope for LetterWithResponder<A, M> {
     type Actor = A;
 
-    async fn dispatch(&mut self, actor: &mut A, assistant: &Assistant<A>) {
+    async fn dispatch(&mut self, actor: &mut A, assistant: &ActorAssistant<A>) {
         LetterWithResponder::<A, M>::dispatch(self, actor, assistant).await
     }
 }

@@ -112,7 +112,7 @@
 //! ## Simple Example
 //!
 //! ```rust,no_run
-//! use acteur::{Actor, Receive, Assistant, Acteur};
+//! use acteur::{Actor, Receive, ActorAssistant, Acteur};
 //! use async_trait::async_trait;
 //!
 //! #[derive(Debug)]
@@ -124,7 +124,7 @@
 //! impl Actor for Employee {
 //!     type Id = u32;
 //!
-//!     async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
+//!     async fn activate(_: Self::Id, _: &ActorAssistant<Self>) -> Self {
 //!         Employee {
 //!             salary: 0 // Load from DB or set a default,
 //!         }
@@ -136,7 +136,7 @@
 //!
 //! #[async_trait]
 //! impl Receive<SalaryChanged> for Employee {
-//!     async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
+//!     async fn handle(&mut self, message: SalaryChanged, _: &ActorAssistant<Employee>) {
 //!         self.salary = message.0;
 //!     }
 //! }
@@ -204,9 +204,9 @@ mod services;
 mod system_director;
 
 pub use actors::actor::Actor;
-pub use actors::assistant::Assistant;
+pub use actors::assistant::ActorAssistant;
 pub use actors::handle::{Receive, Respond};
 pub use facade::Acteur;
 pub use services::handle::{Notify, Serve};
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
-pub use services::system_facade::ServiceAssistant;
+pub use services::system_facade::ServiceActorAssistant;

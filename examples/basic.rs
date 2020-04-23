@@ -1,4 +1,4 @@
-use acteur::{Acteur, Actor, Assistant, Receive};
+use acteur::{Acteur, Actor, ActorAssistant, Receive};
 use async_trait::async_trait;
 
 #[derive(Debug)]
@@ -10,7 +10,7 @@ struct Employee {
 impl Actor for Employee {
     type Id = u32;
 
-    async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
+    async fn activate(_: Self::Id, _: &ActorAssistant<Self>) -> Self {
         Employee {
             salary: 0, //Load from DB or set a default,
         }
@@ -22,7 +22,7 @@ struct SalaryChanged(u32);
 
 #[async_trait]
 impl Receive<SalaryChanged> for Employee {
-    async fn handle(&mut self, message: SalaryChanged, _: &Assistant<Employee>) {
+    async fn handle(&mut self, message: SalaryChanged, _: &ActorAssistant<Employee>) {
         self.salary = message.0;
     }
 }

@@ -12,7 +12,7 @@ use std::fmt::Debug;
 /// The Actor's assistant allows to send messages and to execute some task over the system.
 ///
 /// ```rust,no_run
-/// # use acteur::{Actor, Receive, Assistant, Acteur};
+/// # use acteur::{Actor, Receive, ActorAssistant, Acteur};
 /// # use async_trait::async_trait;
 /// #
 /// # #[derive(Debug)]
@@ -25,7 +25,7 @@ use std::fmt::Debug;
 /// # impl Actor for Employee {
 /// #     type Id = u32;
 /// #
-/// #     async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
+/// #     async fn activate(_: Self::Id, _: &ActorAssistant<Self>) -> Self {
 /// #         Employee {
 /// #             salary: 0, // Load from DB or set a default,
 /// #             manager_id: 0 ,
@@ -40,13 +40,13 @@ use std::fmt::Debug;
 /// # impl Actor for Manager {
 /// #     type Id = u32;
 /// #
-/// #     async fn activate(_: Self::Id, _: &Assistant<Self>) -> Self {
+/// #     async fn activate(_: Self::Id, _: &ActorAssistant<Self>) -> Self {
 /// #         Manager
 /// #     }
 /// # }
 /// # #[async_trait]
 /// # impl Receive<SayByeForever> for Manager {
-/// #     async fn handle(&mut self, message: SayByeForever, assistant: &Assistant<Manager>) {}
+/// #     async fn handle(&mut self, message: SayByeForever, assistant: &ActorAssistant<Manager>) {}
 /// # }
 /// #[derive(Debug)]
 /// struct SalaryChanged(u32);
@@ -56,7 +56,7 @@ use std::fmt::Debug;
 ///
 /// #[async_trait]
 /// impl Receive<SalaryChanged> for Employee {
-///     async fn handle(&mut self, message: SalaryChanged, assistant: &Assistant<Employee>) {
+///     async fn handle(&mut self, message: SalaryChanged, assistant: &ActorAssistant<Employee>) {
 ///         if self.salary > message.0 {
 ///             assistant.send_to_actor::<Manager, SayByeForever>(self.manager_id, SayByeForever("Betrayer!".to_string()));
 ///         }
@@ -75,19 +75,19 @@ use std::fmt::Debug;
 ///
 /// ```
 ///
-pub struct Assistant<A: Actor> {
+pub struct ActorAssistant<A: Actor> {
     system_director: SystemDirector,
     actors_director: ActorsDirector,
     actor_id: A::Id,
 }
 
-impl<A: Actor> Assistant<A> {
+impl<A: Actor> ActorAssistant<A> {
     pub(crate) fn new(
         system_director: SystemDirector,
         actors_director: ActorsDirector,
         actor_id: A::Id,
-    ) -> Assistant<A> {
-        Assistant {
+    ) -> ActorAssistant<A> {
+        ActorAssistant {
             system_director,
             actors_director,
             actor_id,
@@ -156,9 +156,9 @@ impl<A: Actor> Assistant<A> {
     }
 }
 
-impl<A: Actor> Clone for Assistant<A> {
+impl<A: Actor> Clone for ActorAssistant<A> {
     fn clone(&self) -> Self {
-        Assistant {
+        ActorAssistant {
             actors_director: self.actors_director.clone(),
             actor_id: self.actor_id.clone(),
             system_director: self.system_director.clone(),
@@ -166,7 +166,7 @@ impl<A: Actor> Clone for Assistant<A> {
     }
 }
 
-impl<A: Actor> Debug for Assistant<A> {
+impl<A: Actor> Debug for ActorAssistant<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ActorSecretary for {}", std::any::type_name::<A>())
     }

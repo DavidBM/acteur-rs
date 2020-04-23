@@ -2,7 +2,7 @@ use crate::services::broker::MessageBroker;
 use crate::services::director::ServicesDirector;
 use crate::services::envelope::ServiceEnvelope;
 use crate::services::service::{Service, ServiceConcurrency};
-use crate::services::system_facade::ServiceAssistant;
+use crate::services::system_facade::ServiceActorAssistant;
 use crate::system_director::SystemDirector;
 use async_std::sync::Mutex;
 use async_std::{
@@ -51,7 +51,7 @@ impl<S: Service> ServiceManager<S> {
         system_director: SystemDirector,
         broker: MessageBroker,
     ) -> ServiceManager<S> {
-        let system_facade = ServiceAssistant::<S>::new(system_director.clone(), broker.clone());
+        let system_facade = ServiceActorAssistant::<S>::new(system_director.clone(), broker.clone());
 
         let (service, service_conf) = S::initialize(&system_facade).await;
 
@@ -142,7 +142,7 @@ fn service_loop<S: Service>(
 ) {
     task::spawn(async move {
         task::spawn(async move {
-            let system_facade = ServiceAssistant::<S>::new(system_director, broker);
+            let system_facade = ServiceActorAssistant::<S>::new(system_director, broker);
 
             loop {
                 if let Some(command) = receiver.recv().await {

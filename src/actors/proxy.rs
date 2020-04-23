@@ -2,7 +2,7 @@ use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::actors::manager::ActorsManager;
 use crate::system_director::SystemDirector;
-use crate::{Actor, Assistant, Receive, Respond};
+use crate::{Actor, ActorAssistant, Receive, Respond};
 use async_std::{
     future,
     sync::{channel, Receiver, Sender},
@@ -41,7 +41,7 @@ impl<A: Actor> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
             channel(5);
 
-        let assistant = Assistant::new(system_director, actors_director, id.clone());
+        let assistant = ActorAssistant::new(system_director, actors_director, id.clone());
 
         actor_loop(
             id,
@@ -118,7 +118,7 @@ fn actor_loop<A: Actor>(
     id: A::Id,
     sender: Sender<ActorProxyCommand<A>>,
     receiver: Receiver<ActorProxyCommand<A>>,
-    assistant: Assistant<A>,
+    assistant: ActorAssistant<A>,
     manager: ActorsManager<A>,
     innactivity_duration_until_end: Duration,
 ) {
