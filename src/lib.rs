@@ -61,6 +61,17 @@
 //! - [Listen](./trait.Listen.html): Receives a message without responding to it. The most efficient way to handle messages.
 //! - [Serve](./trait.Serve.html): Receives a message and allows to respond to it. Forces to sender to await until the actor respond.
 //!
+//! #### Why are you using 4 different trait instead of 1 or 2?
+//! 
+//! I tried to merge Traits but I didn't find how to do it because:
+//! 
+//! A) The handle method contains the ActorAssistant and ServiceAssistant types in the signatures, witch have different types.
+//! B) I don't like to create a response channel for EVERY message when many messages don't need a response.
+//! 
+//! Both blockes make 4 combinations. Receive/Respond for Actors and Listen/Serve for Services.
+//! 
+//! I'm still trying to improve the naming and ergonimocs. I think the concept will remain, but the ergonomics may change a bit. 
+//! 
 //! ## Actors & Services
 //!
 //! Acteur provides 2 ways of concurrency. Actors and Services.
