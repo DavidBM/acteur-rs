@@ -1,4 +1,4 @@
-use acteur::{Acteur, Serve, Service, ServiceActorAssistant, ServiceConfiguration};
+use acteur::{Acteur, Serve, Service, ServiceAssistant, ServiceConfiguration};
 
 #[derive(Debug)]
 struct EmployeeTaxesCalculator {
@@ -7,7 +7,7 @@ struct EmployeeTaxesCalculator {
 
 #[async_trait::async_trait]
 impl Service for EmployeeTaxesCalculator {
-    async fn initialize(_: &ServiceActorAssistant<Self>) -> (Self, ServiceConfiguration) {
+    async fn initialize(_: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration) {
         let service = EmployeeTaxesCalculator { tax_rate: 0.21 };
         let service_conf = ServiceConfiguration::default();
         (service, service_conf)
@@ -20,7 +20,7 @@ struct EmployeeSalaryChange(f32);
 #[async_trait::async_trait]
 impl Serve<EmployeeSalaryChange> for EmployeeTaxesCalculator {
     type Response = f32;
-    async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceActorAssistant<Self>) -> f32 {
+    async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceAssistant<Self>) -> f32 {
         self.tax_rate * message.0
     }
 }

@@ -1,4 +1,4 @@
-use acteur::{Acteur, Listen, Service, ServiceActorAssistant, ServiceConfiguration};
+use acteur::{Acteur, Listen, Service, ServiceAssistant, ServiceConfiguration};
 use async_std::sync::Mutex;
 
 #[derive(Debug)]
@@ -10,7 +10,7 @@ struct EmployeeExpensesCalculator {
 
 #[async_trait::async_trait]
 impl Service for EmployeeExpensesCalculator {
-    async fn initialize(_: &ServiceActorAssistant<Self>) -> (Self, ServiceConfiguration) {
+    async fn initialize(_: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration) {
         println!("Initializing EmployeeExpensesCalculator");
 
         let service = EmployeeExpensesCalculator {
@@ -28,7 +28,7 @@ struct EmployeeHired(f32);
 
 #[async_trait::async_trait]
 impl Listen<EmployeeHired> for EmployeeExpensesCalculator {
-    async fn handle(&self, message: EmployeeHired, _: &ServiceActorAssistant<Self>) {
+    async fn handle(&self, message: EmployeeHired, _: &ServiceAssistant<Self>) {
         println!("Adding {} salary to the employee expenses", message.0);
         *self.employee_expenses.lock().await += message.0;
     }

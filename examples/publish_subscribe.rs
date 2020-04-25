@@ -1,4 +1,4 @@
-use acteur::{Acteur, Listen, Service, ServiceActorAssistant, ServiceConfiguration};
+use acteur::{Acteur, Listen, Service, ServiceAssistant, ServiceConfiguration};
 
 #[derive(Debug)]
 struct EmployeeTaxesCalculator {
@@ -7,7 +7,7 @@ struct EmployeeTaxesCalculator {
 
 #[async_trait::async_trait]
 impl Service for EmployeeTaxesCalculator {
-    async fn initialize(system: &ServiceActorAssistant<Self>) -> (Self, ServiceConfiguration) {
+    async fn initialize(system: &ServiceAssistant<Self>) -> (Self, ServiceConfiguration) {
         let service = EmployeeTaxesCalculator { tax_rate: 0.21 };
         let service_conf = ServiceConfiguration::default();
 
@@ -27,7 +27,7 @@ struct EmployeeSalaryChange(f32);
 // Subscription uses the trait Listen, as normal message sends
 #[async_trait::async_trait]
 impl Listen<EmployeeSalaryChange> for EmployeeTaxesCalculator {
-    async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceActorAssistant<Self>) {
+    async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceAssistant<Self>) {
         println!("Message received! {:?}", message);
 
         // Calculate the tax rate and send it to however you want

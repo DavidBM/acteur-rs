@@ -221,5 +221,5 @@ pub use actors::assistant::ActorAssistant;
 pub use actors::handle::{Receive, Respond};
 
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
-pub use services::system_facade::ServiceActorAssistant;
+pub use services::system_facade::ServiceAssistant;
 pub use services::handle::{Listen, Serve};

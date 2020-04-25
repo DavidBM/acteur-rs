@@ -2,7 +2,7 @@ use crate::actors::envelope::Letter;
 use crate::services::handle::Listen;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
-use crate::services::system_facade::ServiceActorAssistant;
+use crate::services::system_facade::ServiceAssistant;
 use async_std::sync::Sender;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 pub(crate) trait ServiceEnvelope: Send + Debug {
     type Service: Service;
 
-    async fn dispatch(&mut self, service: &Self::Service, system: &ServiceActorAssistant<Self::Service>);
+    async fn dispatch(&mut self, service: &Self::Service, system: &ServiceAssistant<Self::Service>);
 }
 
 /// For send without response we can use the normal Letter struct
@@ -28,7 +28,7 @@ impl<S: Service + Listen<M>, M: Debug> Letter<S, M> {
         }
     }
 
-    pub async fn dispatch_service(&mut self, service: &S, system: &ServiceActorAssistant<S>) {
+    pub async fn dispatch_service(&mut self, service: &S, system: &ServiceAssistant<S>) {
         if let Some(message) = self.message.take() {
             <S as Listen<M>>::handle(service, message, system).await;
         }
@@ -43,7 +43,7 @@ impl<S: Service + Listen<M>, M: Debug + Send> ServiceEnvelope for Letter<S, M> {
     async fn dispatch(
         &mut self,
         service: &Self::Service,
-        system: &ServiceActorAssistant<Self::Service>,
+        system: &ServiceAssistant<Self::Service>,
     ) {
         Letter::<S, M>::dispatch_service(self, service, system).await;
     }
@@ -70,7 +70,7 @@ impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
         }
     }
 
-    async fn dispatch(&mut self, service: &S, system: &ServiceActorAssistant<S>) {
+    async fn dispatch(&mut self, service: &S, system: &ServiceAssistant<S>) {
         if let Some(message) = self.message.take() {
             if let Some(responder) = self.responder.take() {
                 let result = <S as Serve<M>>::handle(service, message, system).await;
@@ -85,7 +85,7 @@ impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
 impl<S: Service + Serve<M>, M: Debug + Send> ServiceEnvelope for ServiceLetterWithResponders<S, M> {
     type Service = S;
 
-    async fn dispatch(&mut self, service: &Self::Service, system: &ServiceActorAssistant<S>) {
+    async fn dispatch(&mut self, service: &Self::Service, system: &ServiceAssistant<S>) {
         ServiceLetterWithResponders::<S, M>::dispatch(self, service, system).await;
     }
 }

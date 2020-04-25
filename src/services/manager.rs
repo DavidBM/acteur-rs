@@ -2,7 +2,7 @@ use crate::services::broker::MessageBroker;
 use crate::services::director::ServicesDirector;
 use crate::services::envelope::ServiceEnvelope;
 use crate::services::service::{Service, ServiceConcurrency};
-use crate::services::system_facade::ServiceActorAssistant;
+use crate::services::system_facade::ServiceAssistant;
 use crate::system_director::SystemDirector;
 use async_std::sync::Mutex;
 use async_std::{
@@ -51,19 +51,36 @@ impl<S: Service> ServiceManager<S> {
         system_director: SystemDirector,
         broker: MessageBroker,
     ) -> ServiceManager<S> {
-        let system_facade =
-            ServiceActorAssistant::<S>::new(system_director.clone(), broker.clone());
+        let system_facade = ServiceAssistant::<S>::new(system_director.clone(), broker.clone());
 
         let (service, service_conf) = S::initialize(&system_facade).await;
 
         let service = Arc::new(service);
 
+        // Controls if the loop waits for the service functions to finish.
+        let mut wait_for_service = true;
+
         let concurrency = match service_conf.concurrency {
-            ServiceConcurrency::Automatic => num_cpus::get(),
+            ServiceConcurrency::Automatic => {
+                // If the structure is size 0 we can safely assume that there is no state / synchronization mechanisms,
+                // therefore we set the concurrency as unlimited.
+                if std::mem::size_of::<S>() == 0 {
+                    // loop won't wait for service handler to finish
+                    wait_for_service = false;
+                    1
+                } else {
+                    num_cpus::get()
+                }
+            }
             ServiceConcurrency::None => 1,
             ServiceConcurrency::OnePerCore => num_cpus::get(),
             ServiceConcurrency::OneEachTwoCore => num_cpus::get() / 2,
             ServiceConcurrency::Fixed(quantity) => quantity,
+            ServiceConcurrency::Unlimited => {
+                // loop won't wait for service handler to finish
+                wait_for_service = false;
+                1
+            }
         };
 
         let mut senders = Vec::new();
@@ -95,6 +112,7 @@ impl<S: Service> ServiceManager<S> {
                 active_services.clone(),
                 system_director.clone(),
                 broker.clone(),
+                wait_for_service,
             );
         }
 
@@ -140,15 +158,16 @@ fn service_loop<S: Service>(
     active_services: Arc<AtomicUsize>,
     system_director: SystemDirector,
     broker: MessageBroker,
+    wait_for_service: bool,
 ) {
     task::spawn(async move {
-        let system_facade = ServiceActorAssistant::<S>::new(system_director, broker);
+        let system_facade = Arc::new(ServiceAssistant::<S>::new(system_director, broker));
 
         loop {
             if let Some(command) = receiver.recv().await {
                 match command {
-                    ServiceManagerCommand::Dispatch(mut envelope) => {
-                        envelope.dispatch(&service, &system_facade).await
+                    ServiceManagerCommand::Dispatch(envelope) => {
+                        dispatch::<S>(&service, &system_facade, envelope, wait_for_service).await;
                     }
                     // This algorithm is basically the same as the one in the Actor's Proxy. Check that file
                     // for an explanation in detail.
@@ -173,10 +192,10 @@ fn service_loop<S: Service>(
                                 .await
                                 {
                                     // If there are more messages, we requeue the end and process the message.
-                                    Some(ServiceManagerCommand::Dispatch(mut envelope)) => {
+                                    Some(ServiceManagerCommand::Dispatch(envelope)) => {
                                         drop(entry);
                                         sender.send(ServiceManagerCommand::End).await;
-                                        envelope.dispatch(&service, &system_facade).await
+                                        dispatch::<S>(&service, &system_facade, envelope, wait_for_service).await;
                                     }
                                     // If there aren't new messages, we finish the loop.
                                     None | Some(ServiceManagerCommand::End) => {
@@ -198,9 +217,9 @@ fn service_loop<S: Service>(
                                     }
                                 }
                             }
-                            Some(ServiceManagerCommand::Dispatch(mut envelope)) => {
+                            Some(ServiceManagerCommand::Dispatch(envelope)) => {
                                 sender.send(ServiceManagerCommand::End).await;
-                                envelope.dispatch(&service, &system_facade).await
+                                dispatch::<S>(&service, &system_facade, envelope, wait_for_service).await;
                             }
                         }
                     }
@@ -208,6 +227,21 @@ fn service_loop<S: Service>(
             }
         }
     });
+}
+
+async fn dispatch<'a, S: Service>(
+    service: &'a Arc<S>,
+    system_facade: &'a Arc<ServiceAssistant<S>>,
+    mut envelope: Box<dyn ServiceEnvelope<Service = S>>,
+    wait_for_service: bool,
+) {
+    if wait_for_service {
+        envelope.dispatch(&service, &system_facade).await;
+    } else {
+        let service = service.clone();
+        let system_facade = system_facade.clone();
+        task::spawn(async move { envelope.dispatch(&service, &system_facade).await });
+    }
 }
 
 #[async_trait::async_trait]
