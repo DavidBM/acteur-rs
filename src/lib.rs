@@ -152,13 +152,13 @@
 //!     }
 //! }
 //!
-//! # fn main() {
-//! let sys = Acteur::new();
+//! fn main() {
+//!     let sys = Acteur::new();
 //!
-//! sys.send_to_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
+//!     sys.send_to_actor_sync::<Employee, SalaryChanged>(42, SalaryChanged(55000));
 //!
-//! sys.wait_until_stopped();
-//! # }
+//!     sys.wait_until_stopped();
+//! }
 //!
 //! ```
 //!
@@ -214,10 +214,12 @@ mod facade;
 mod services;
 mod system_director;
 
+pub use facade::Acteur;
+
 pub use actors::actor::Actor;
 pub use actors::assistant::ActorAssistant;
 pub use actors::handle::{Receive, Respond};
-pub use facade::Acteur;
-pub use services::handle::{Listen, Serve};
+
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
 pub use services::system_facade::ServiceActorAssistant;
+pub use services::handle::{Listen, Serve};

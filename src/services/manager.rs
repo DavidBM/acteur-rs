@@ -51,7 +51,8 @@ impl<S: Service> ServiceManager<S> {
         system_director: SystemDirector,
         broker: MessageBroker,
     ) -> ServiceManager<S> {
-        let system_facade = ServiceActorAssistant::<S>::new(system_director.clone(), broker.clone());
+        let system_facade =
+            ServiceActorAssistant::<S>::new(system_director.clone(), broker.clone());
 
         let (service, service_conf) = S::initialize(&system_facade).await;
 
@@ -80,16 +81,16 @@ impl<S: Service> ServiceManager<S> {
 
         let manager = ServiceManager {
             senders: senders.clone(),
-            current: current.clone(),
+            current,
             is_ending: Arc::new(AtomicBool::new(false)),
             active_services: active_services.clone(),
         };
 
-        for receiver in receivers {
+        for (receiver, sender) in receivers.iter().zip(senders.as_ref()) {
             service_loop(
-                receiver,
+                receiver.clone(),
+                sender.clone(),
                 service.clone(),
-                Clone::clone(&manager),
                 director.clone(),
                 active_services.clone(),
                 system_director.clone(),
@@ -118,7 +119,7 @@ impl<S: Service> ServiceManager<S> {
             *current = 0;
         }
 
-        (*current).clone()
+        *current
     }
 
     fn end(&self) {
@@ -133,90 +134,79 @@ impl<S: Service> ServiceManager<S> {
 
 fn service_loop<S: Service>(
     receiver: Receiver<ServiceManagerCommand<S>>,
+    sender: Sender<ServiceManagerCommand<S>>,
     service: Arc<S>,
-    manager: ServiceManager<S>,
     director: ServicesDirector,
     active_services: Arc<AtomicUsize>,
     system_director: SystemDirector,
     broker: MessageBroker,
 ) {
     task::spawn(async move {
-        task::spawn(async move {
-            let system_facade = ServiceActorAssistant::<S>::new(system_director, broker);
+        let system_facade = ServiceActorAssistant::<S>::new(system_director, broker);
 
-            loop {
-                if let Some(command) = receiver.recv().await {
-                    match command {
-                        ServiceManagerCommand::Dispatch(mut envelope) => {
-                            envelope.dispatch(&service, &system_facade).await
-                        }
-                        // This algorithm is basically the same as the one in the Actor's Proxy. Check that file
-                        // for an explanation in detail.
-                        //
-                        // Basically, we are trying to consume all End commands (even if there are several in a row)
-                        // and if we find another command that is not end, requeue the end and process such command.
-                        ServiceManagerCommand::End => {
-                            match recv_until_command_or_end!(receiver, ServiceManagerCommand::End)
+        loop {
+            if let Some(command) = receiver.recv().await {
+                match command {
+                    ServiceManagerCommand::Dispatch(mut envelope) => {
+                        envelope.dispatch(&service, &system_facade).await
+                    }
+                    // This algorithm is basically the same as the one in the Actor's Proxy. Check that file
+                    // for an explanation in detail.
+                    //
+                    // Basically, we are trying to consume all End commands (even if there are several in a row)
+                    // and if we find another command that is not end, requeue the end and process such command.
+                    ServiceManagerCommand::End => {
+                        match recv_until_command_or_end!(receiver, ServiceManagerCommand::End).await
+                        {
+                            None | Some(ServiceManagerCommand::End) => {
+                                // From here to the `break;` statement only 1 thread will do it at the same time
+                                // as this line will block other threads.
+                                let entry = director
+                                    .get_blocking_manager_entry(std::any::TypeId::of::<S>());
+
+                                // Now that we are sure that only one threat is here at a time, lets see if there
+                                // are more messages pending.
+                                match recv_until_command_or_end!(
+                                    receiver,
+                                    ServiceManagerCommand::End
+                                )
                                 .await
-                            {
-                                None | Some(ServiceManagerCommand::End) => {
-                                    // From here to the `break;` statement only 1 thread will do it at the same time
-                                    // as this line will block other threads.
-                                    let entry = director
-                                        .get_blocking_manager_entry(std::any::TypeId::of::<S>());
+                                {
+                                    // If there are more messages, we requeue the end and process the message.
+                                    Some(ServiceManagerCommand::Dispatch(mut envelope)) => {
+                                        drop(entry);
+                                        sender.send(ServiceManagerCommand::End).await;
+                                        envelope.dispatch(&service, &system_facade).await
+                                    }
+                                    // If there aren't new messages, we finish the loop.
+                                    None | Some(ServiceManagerCommand::End) => {
+                                        // Given that services run with some concurrency, we keep the count
+                                        // of services actually running.
+                                        let previously_active =
+                                            active_services.fetch_sub(1, Ordering::Relaxed);
 
-                                    // Now that we are sure that only one threat is here at a time, lets see if there
-                                    // are more messages pending.
-                                    match recv_until_command_or_end!(
-                                        receiver,
-                                        ServiceManagerCommand::End
-                                    )
-                                    .await
-                                    {
-                                        // If there are more messages, we requeue the end and process the message.
-                                        Some(ServiceManagerCommand::Dispatch(mut envelope)) => {
-                                            drop(entry);
-                                            manager
-                                                .get_sender()
-                                                .await
-                                                .send(ServiceManagerCommand::End)
-                                                .await;
-                                            envelope.dispatch(&service, &system_facade).await
-                                        }
-                                        // If there aren't new messages, we finish the loop.
-                                        None | Some(ServiceManagerCommand::End) => {
-                                            // Given that services run with some concurrency, we keep the count
-                                            // of services actually running.
-                                            let previously_active =
-                                                active_services.fetch_sub(1, Ordering::Relaxed);
-
-                                            if let Occupied(entry) = entry {
-                                                // Only if there are 0 we remove the manager.
-                                                // We check agains 1 because fetch_sub returns the previous number.
-                                                if previously_active <= 1 {
-                                                    entry.remove();
-                                                    director.signal_manager_removed().await;
-                                                }
+                                        if let Occupied(entry) = entry {
+                                            // Only if there are 0 we remove the manager.
+                                            // We check agains 1 because fetch_sub returns the previous number.
+                                            if previously_active <= 1 {
+                                                entry.remove();
+                                                director.signal_manager_removed().await;
                                             }
-
-                                            break;
                                         }
+
+                                        break;
                                     }
                                 }
-                                Some(ServiceManagerCommand::Dispatch(mut envelope)) => {
-                                    manager
-                                        .get_sender()
-                                        .await
-                                        .send(ServiceManagerCommand::End)
-                                        .await;
-                                    envelope.dispatch(&service, &system_facade).await
-                                }
+                            }
+                            Some(ServiceManagerCommand::Dispatch(mut envelope)) => {
+                                sender.send(ServiceManagerCommand::End).await;
+                                envelope.dispatch(&service, &system_facade).await
                             }
                         }
                     }
                 }
             }
-        });
+        }
     });
 }
 
