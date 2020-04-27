@@ -10,7 +10,7 @@
 - ☑️ Services (statefull or stateless, like actors, without ID and processing messages concurrently)
 - ☑️ Automatic deallocation of unused actors
 - ☑️ Subscribe to message
-- □ Actor deallocation configuration (based in RAM, Actor count or timeout)
+- □ Actor deallocation configuration (based in RAM, Actor count, fully manual or timeout)
 - □ Allow more than 150.000 queued messages per actor (waiting for async_std to have unbounded channels: [https://github.com/async-rs/async-std/issues/212]())
 - □ Add service with "unlimited" concurrency for cases where DB queries need to be done or cases where they are just the middleman between external world and actors.
 

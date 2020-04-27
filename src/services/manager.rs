@@ -129,6 +129,10 @@ impl<S: Service> ServiceManager<S> {
     }
 
     pub(crate) async fn get_next_sender_index(&self) -> usize {
+        if self.senders.len() == 1 {
+            return 0
+        }
+
         let mut current = self.current.lock().await;
 
         *current += 1;

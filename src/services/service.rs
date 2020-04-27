@@ -77,7 +77,7 @@ pub enum ServiceConcurrency {
     OneEachTwoCore,
     /// creates a fixed number of loops, efectively allowing a fixed concurrency.
     Fixed(usize),
-    /// In this mode the loop consuming messages won't await the service handler, instead it will create 
+    /// In this mode the only one loop will be spawned, but it won't await the service handler, instead it will spawn 
     /// a concurrent task that will be executed whenever is possible. 
     Unlimited,
 }

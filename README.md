@@ -47,7 +47,7 @@ This actor system work under the following premises:
 The overall feature set is complete. Acteur will continue improving 
 and adding improvements. As for now, this framework is actively supported/developed.
 
-My main focus of work now is in the ergonomics.
+The current focus is on ergonomics and use cases. Hopefully we can have an stable API soon.
 
 - ☑️ Actor / services is activated on first message
 - ☑️ Actor can send messages to other actors / services
@@ -56,6 +56,7 @@ My main focus of work now is in the ergonomics.
 - ☑️ Services (statefull or stateless, like actors, without ID and concurrent)
 - ☑️ Automatic deallocation of unused actors (after 5 minutes without messages)
 - ☑️ Services can subscribe to messages
+- ☑️ Different concurrency modes for services (fixed, core cound, unlimited, etc)
 
 ## Examples
 
