@@ -1,0 +1,13 @@
+[package]
+name = "http"
+version = "0.1.0"
+authors = ["David Bonet <webbonet@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tide = "0.8.0"
+serde = {version="1.0.106", features=["derive"]}
+async-std = {version="1.5.0", features=["attributes"]}
+acteur = "0.10.0"
+async-trait = "0.1.30"
+serde_json = "1.0.51"
