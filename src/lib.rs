@@ -28,21 +28,21 @@
 //! 
 //! Acteur takes inspiration in Actors but it takes a different path. Actor based concurrency 
 //! model is a concurrency modeling tool, not a business logic one, therefore, you cannot expect 
-//! to solve logic organization problrms with Actors. Still, Actors is a very nice abstraction 
-//! that can, tangencially, solve certain nuances of logic organization. Even more when the code scales.
+//! to solve logic organization problems with Actors. Still, Actors is a very nice abstraction 
+//! that can, tangentially, solve certain nuances of logic organization. Even more when the code scales.
 //! 
 //! In the way Acteur is implemented it searches to help you splitting your instances and keep 
-//! request ordered and concurrent as much as possible betwen instances.
+//! request ordered and concurrent as much as possible between instances.
 //! 
 //! Said that, Acteur is provably **not** the tool you want if:
 //! 
-//!  - You want to have a full ACID compilant system
+//!  - You want to have a full ACID compliant system
 //!  - You want to fully follow the Actor model
-//!  - You need to scale to A LOT of traffic. In wich case you will need more than one server. (I'm planning to implement some multiserver clusteing, but for now, only one server).
+//!  - You need to scale to A LOT of traffic. In which case you will need more than one server. (I'm planning to implement some multi-server clustering, but for now, only one server).
 //! 
 //! But it may help you if you want:
 //! 
-//!  - To have a database but not incur in the cost of READ, APPLY, SAVE, and instad you want to keep object instances in RAM.
+//!  - To have a database but not incur in the cost of READ, APPLY, SAVE, and instead you want to keep object instances in RAM.
 //!  - You don't want to deal with optimistic concurrency and you want the messages to process one by one for each ID, but concurrently between IDs.
 //!  - You want to make an backend for an online videogame with many entities interacting at the same time but don't want to go all the way with ECS.
 //!
