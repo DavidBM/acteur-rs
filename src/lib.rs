@@ -1,12 +1,13 @@
 //! # Acteur Actor System
 //!
-//! An actor system written in Rust that just works. Simple, robust, fast, documented.
+//! An safe & opinionated actor system written in Rust that just works. Simple, robust, fast, documented.
 //!
 //! ## Main features of Acteur
 //!
 //! Acteur uses [`async_std`](https://github.com/async-rs/async-std) under the hood. You can find the all the information in the [documentation](https://docs.rs/acteur).
 //! 
-//! This actor system work under the following premises:
+//! This actor system is a bit different than other frameworks. It work under the following premises:
+//!  - **High-level**: The framework is oriented to map business logic rather than concurrent tasks.
 //!  - **Simple**: The API should be small, simple and intuitive. No surprises.
 //!  - **Fast**: The system should be fast and use all available CPU cores.
 //!  - **Documented**: Everything must be documented with exhaustive examples.
@@ -15,13 +16,35 @@
 //!
 //!  - Acteur is **asynchronous** and uses `async_std` under the hood. (Even for mutexes)
 //!  - Actors have an *ID* which type is defined by the developer.
-//!  - Messages are routed to an *Actor* and an *ID*.
+//!  - Messages are routed to an *Actor* and an *ID* .
 //!  - Actor life-cycle is *automatically* managed by the framework.
 //!  - Messages for the same Actor & ID are *sequential*. Everything else is executed **concurrently**.
 //!  - Services are provided for other concurrency forms.
 //!  - Services **don't** have ID and are concurrent.
 //!  - Services can **subscribe** to messages and everyone can **publish** messages.
 //!  - Acteur is **global**, only one instance can exist.
+//!  
+//! ### Note about calling Acteur and Actor system
+//! 
+//! Acteur takes inspiration in Actors but it takes a different path. Actor based concurrency 
+//! model is a concurrency modeling tool, not a business logic one, therefore, you cannot expect 
+//! to solve logic organization problrms with Actors. Still, Actors is a very nice abstraction 
+//! that can, tangencially, solve certain nuances of logic organization. Even more when the code scales.
+//! 
+//! In the way Acteur is implemented it searches to help you splitting your instances and keep 
+//! request ordered and concurrent as much as possible betwen instances.
+//! 
+//! Said that, Acteur is provably **not** the tool you want if:
+//! 
+//!  - You want to have a full ACID compilant system
+//!  - You want to fully follow the Actor model
+//!  - You need to scale to A LOT of traffic. In wich case you will need more than one server. (I'm planning to implement some multiserver clusteing, but for now, only one server).
+//! 
+//! But it may help you if you want:
+//! 
+//!  - To have a database but not incur in the cost of READ, APPLY, SAVE, and instad you want to keep object instances in RAM.
+//!  - You don't want to deal with optimistic concurrency and you want the messages to process one by one for each ID, but concurrently between IDs.
+//!  - You want to make an backend for an online videogame with many entities interacting at the same time but don't want to go all the way with ECS.
 //!
 //! ### State of the implementation
 //!
