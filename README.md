@@ -45,20 +45,20 @@ This actor system is a bit different than other frameworks. It work under the fo
  
 ### Note about calling Acteur and Actor system
 
-Acteur takes inspiration in Actors but it takes a different path. Actor based concurrency model is a concurrency modeling tool, not a business logic one, therefore, you cannot expect to solve logic organization problrms with Actors. Still, Actors is a very nice abstraction that can, tangencially, solve certain nuances of logic organization. Even more when the code scales. 
+Acteur takes inspiration in Actors but it takes a different path. Actor based concurrency model is a concurrency modeling tool, not a business logic one, therefore, you cannot expect it to solve logic-organization problems with Actors. Still, Actors are a very nice abstraction that can, tangencially, solve certain nuances. Even more when the code scales. 
 
-In the way Acteur is implemented it searches to help you splitting your instances and keep request ordered and concurrent as much as possible betwen instances. 
+In the way Acteur is implemented it searches to help you split your instances and keep request ordered and concurrent as much as possible between instances. 
 
 Said that, Acteur is provably not the tool you want if:
 
-- You want to have a full ACID compilant system
+- You want to have a full ACID compliant system
 - You want to fully follow the Actor model
-- You need to scale to A LOT of traffic. In wich case you will need more than one server. (I'm planning to implement some multiserver clusteing, but for now, only one server).
+- You need to scale to several servers withing the framework (like, Actor Sharding, half in one server, half in other). I'm planning to implement some multiserver clusteing but for now only one server.
 
 But it may help you if you want:
 
-- To have a database but not incur in the cost of READ, APPLY, SAVE, and instad you want to keep object instances in RAM.
-- You don't want to deal with optimistic concurrency and you want the messages to process one by one for each ID, but concurrently between IDs. 
+- To have a database but to not incur in the cost of READ, APPLY, SAVE, and instead you want to keep object instances in RAM.
+- You don't want to deal with optimistic concurrency and you want the messages to be processed one by one for each ID, but concurrently between IDs. 
 
 ### State of the implementation
 
