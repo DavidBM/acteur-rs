@@ -6,6 +6,12 @@
 //!
 //! Acteur uses [`async_std`](https://github.com/async-rs/async-std) under the hood. You can find the all the information in the [documentation](https://docs.rs/acteur).
 //! 
+//! ## Status update
+//! 
+//! I taking some time to think better where to fit this framework. In it's current form it is built 
+//! to write business logic, but at the same time it remains kind of a low level framework. I will 
+//! research and see what are the next steps.
+//! 
 //! This actor system is a bit different than other frameworks. It work under the following premises:
 //!  - **High-level**: The framework is oriented to map business logic rather than concurrent tasks.
 //!  - **Simple**: The API should be small, simple and intuitive. No surprises.

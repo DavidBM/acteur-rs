@@ -20,6 +20,9 @@
   </a>
 </div>
 
+## Status update
+
+I taking some time to think better where to fit this framework. In it's current form it is built to write business logic, but at the same time it remains kind of a low level framework. I will research and see what are the next steps. 
 
 ## Main Features
 
