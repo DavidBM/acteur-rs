@@ -1,6 +1,6 @@
 [package]
 name = "acteur"
-version = "0.10.3"
+version = "0.10.4"
 authors = ["David Bonet <webbonet@gmail.com>"]
 edition = "2018"
 description = "A safe actor system that just works. Simple, robust, fast, documented."
@@ -20,6 +20,6 @@ async-std = { version = "1", features = ["unstable"]}
 rand = "0.7"
 dashmap = "3"
 futures = "0.3"
-lazy_static = "1.4.0"
+lazy_static = "1.4"
 futures-util = "0.3.4"
 num_cpus = "1.12.0"
