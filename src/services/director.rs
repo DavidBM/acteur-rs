@@ -110,7 +110,7 @@ impl ServicesDirector {
             )))
             .await;
 
-        receiver.recv().await.ok_or("Ups!")
+        receiver.recv().await.or(Err("Ups"))
     }
 
     pub(crate) async fn wait_until_stopped(&self) {

@@ -128,26 +128,26 @@ fn actor_loop<A: Actor>(
         task::spawn(async move {
             loop {
                 match future::timeout(innactivity_duration_until_end, receiver.recv()).await {
-                    Ok(Some(ActorProxyCommand::Dispatch(mut envelope))) => {
+                    Ok(Ok(ActorProxyCommand::Dispatch(mut envelope))) => {
                         envelope.dispatch(&mut actor, &assistant).await
                     }
                     // The end process is a bit complicated. We don't want that if a End message
-                    // is issued at the same time that someone else is sending a message we process
-                    // messages out of order, or in paralle, or not at all.
+                    // is issued at the same time that someone else is sending a message we end 
+                    // processing messages out of order, or in parallel, or not at all.
                     //
                     // Example: End is received, actor is removed from the HashMap. At the same time
                     // we are still processing the remaining messages. But during that, someone sends
                     // a new message, making the manager to create a new actor that may process
                     // this message before the remaining ones in the old queue.
                     //
-                    // What we do is to use the method `get_own_slot_blocking` in order to get the
+                    // What we do is to use the method `get_blocking_actor_entry` in order to get the
                     // Entry in the manager HashMap in order to block any new message sending as
                     // the the manager searched for the actor each time it needs to send a message.
                     //
                     // This allows the method to stop the sending to this actor, to check any remaining
                     // remaining mesages in the queue, consume them (if any), requeue them (if any) and
                     // finally removing the actor or not from the managers HashMap
-                    Ok(Some(ActorProxyCommand::End)) => {
+                    Ok(Ok(ActorProxyCommand::End)) => {
                         // We may find cases where we can have several End command in a row.
                         // In that case, we want to consume all the end command together until
                         // we find nothing or a not-end command
@@ -196,7 +196,11 @@ fn actor_loop<A: Actor>(
                             }
                         }
                     }
-                    Ok(None) => {
+                    Ok(Err(_)) => {
+                        // TODO: The next comment is not fully right as seems that since async_std 
+                        // changed their channels in order to return an Result instead of an Option
+                        // other type of errors can happen.
+                        // 
                         // `None` indicates that the channel is disconnected. In this case
                         // we end the actor proxy.
                         sender.send(ActorProxyCommand::End).await;

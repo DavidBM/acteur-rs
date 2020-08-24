@@ -12,7 +12,7 @@ use std::fmt::Debug;
 /// both traits. This trait will be executed when using the "call" or "call_sync" method from Acteur or the "call"
 /// method from ActorAssistant.
 ///
-/// ```rust,no-run
+/// ```rust,no_run
 /// use acteur::{Acteur, Service, Listen, ServiceAssistant, ServiceConfiguration};
 /// use async_std::sync::Mutex;
 ///
@@ -71,7 +71,7 @@ where
 /// to process, the response can take long time, slowing down who is calling this service. Preffer always to use 
 /// the [Serve trait](./trait.Serve.html) if you can.
 ///
-/// ```rust,no-run
+/// ```rust,no_run
 /// use acteur::{Acteur, Service, Serve, ServiceConfiguration, ServiceAssistant};
 ///
 /// #[derive(Debug)]

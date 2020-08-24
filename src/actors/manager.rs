@@ -155,7 +155,7 @@ async fn actor_manager_loop<'a, A: Actor>(
     system_director: SystemDirector,
     innactivity_duration_until_end: Duration,
 ) {
-    while let Some(command) = receiver.recv().await {
+    while let Ok(command) = receiver.recv().await {
         match command {
             ActorManagerProxyCommand::Dispatch(command) => {
                 process_dispatch_command(

@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 /// This object is provided to the handle method in the [Receive](./trait.Receive.html) trait for each message
 /// that an Actor receives. The Actor's assistant allows to send messages and to execute some task over the system.
 ///
-/// ```rust,no-run
+/// ```rust,no_run
 /// use acteur::{Acteur, Service, Listen, ServiceConfiguration, ServiceAssistant};
 ///
 /// #[derive(Debug)]

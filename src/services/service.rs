@@ -6,7 +6,7 @@ use std::fmt::Debug;
 /// The concurrency level can be configured during the "initialize" method with the
 /// ServiceConfiguration struct.
 ///
-/// ```rust,no-run
+/// ```rust,no_run
 /// use acteur::{Acteur, Service, Serve, ServiceAssistant, ServiceConfiguration};
 ///
 /// #[derive(Debug)]

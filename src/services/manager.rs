@@ -168,7 +168,7 @@ fn service_loop<S: Service>(
         let system_facade = Arc::new(ServiceAssistant::<S>::new(system_director, broker));
 
         loop {
-            if let Some(command) = receiver.recv().await {
+            if let Ok(command) = receiver.recv().await {
                 match command {
                     ServiceManagerCommand::Dispatch(envelope) => {
                         dispatch::<S>(&service, &system_facade, envelope, wait_for_service).await;

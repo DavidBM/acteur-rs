@@ -7,7 +7,7 @@ macro_rules! recv_until_command_or_end {
             } else {
                 let mut return_command = None;
 
-                while let Some(command) = $rec.recv().await {
+                while let Ok(command) = $rec.recv().await {
                     match command {
                         $end => {
                             if $rec.is_empty() {
