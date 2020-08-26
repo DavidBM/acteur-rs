@@ -244,7 +244,8 @@
 //! ## Contributing
 //! 
 //! First of all, I would be really happy if you decide to check the framework and contribute to it! Just open 
-//! an issue / pull request and we can check what you would like to implement.
+//! an issue / pull request and we can check what you would like to implement. Check more about contributing in 
+//! here: [https://github.com/DavidBM/acteur-rs/blob/master/CONTRIBUTING.md]()
 //! 
 //! ## License
 //! 
