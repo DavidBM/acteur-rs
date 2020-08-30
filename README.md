@@ -214,7 +214,7 @@
      sys.wait_until_stopped();
  }
 
- ```rust
+ ``` 
 
  ## Why another Actors framework?
 

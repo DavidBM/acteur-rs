@@ -212,11 +212,11 @@
 //!     sys.wait_until_stopped();
 //! }
 //!
-//! ```
+//! ``` 
 //!
 //! ## Why another Actors framework?
 //!
-//! Some things bothered me.
+//! Somethings bothered me.
 //!
 //! 1. Actor systems are a concurrency level but I see example of them being used for business logic. Using a normal
 //! HTTP framework + SQL feels more natural than using Actix.
