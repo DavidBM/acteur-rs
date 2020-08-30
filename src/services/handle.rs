@@ -66,9 +66,9 @@ where
 /// This trait is compatible with [Listen trait](./trait.Listen.html) as you can implement, for the same message,
 /// both traits. This trait will be executed when using the "notify" or "notify_sync" method from Acteur or the "notify"
 /// method from ActorAssistant
-/// 
+///
 /// Keep in mind that if someone waits for this service to respond and this service has a long queue of messages
-/// to process, the response can take long time, slowing down who is calling this service. Preffer always to use 
+/// to process, the response can take long time, slowing down who is calling this service. Preffer always to use
 /// the [Serve trait](./trait.Serve.html) if you can.
 ///
 /// ```rust,no_run

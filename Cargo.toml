@@ -3,7 +3,7 @@ name = "acteur"
 version = "0.10.4"
 authors = ["David Bonet <webbonet@gmail.com>"]
 edition = "2018"
-description = "A safe actor system that just works. Simple, robust, fast, documented."
+description = "A safe actor-like framework that just works. Simple, robust, fast, documented."
 license = "Apache-2.0/MIT"
 homepage = "https://github.com/DavidBM/acteur-rs"
 repository = "https://github.com/DavidBM/acteur-rs"
@@ -23,3 +23,9 @@ futures = "0.3"
 lazy_static = "1.4"
 futures-util = "0.3.4"
 num_cpus = "1.12.0"
+raft = { git = "https://github.com/tikv/raft-rs", branch = "master" }
+sled = "0.34"
+byteorder = "1"
+serde = {version = "1.0.115", features = ["derive"]}
+bincode = "1.3.1"
+zerocopy = "0.3.0"

@@ -130,7 +130,7 @@ impl<S: Service> ServiceManager<S> {
 
     pub(crate) async fn get_next_sender_index(&self) -> usize {
         if self.senders.len() == 1 {
-            return 0
+            return 0;
         }
 
         let mut current = self.current.lock().await;
@@ -199,7 +199,13 @@ fn service_loop<S: Service>(
                                     Some(ServiceManagerCommand::Dispatch(envelope)) => {
                                         drop(entry);
                                         sender.send(ServiceManagerCommand::End).await;
-                                        dispatch::<S>(&service, &system_facade, envelope, wait_for_service).await;
+                                        dispatch::<S>(
+                                            &service,
+                                            &system_facade,
+                                            envelope,
+                                            wait_for_service,
+                                        )
+                                        .await;
                                     }
                                     // If there aren't new messages, we finish the loop.
                                     None | Some(ServiceManagerCommand::End) => {
@@ -223,7 +229,8 @@ fn service_loop<S: Service>(
                             }
                             Some(ServiceManagerCommand::Dispatch(envelope)) => {
                                 sender.send(ServiceManagerCommand::End).await;
-                                dispatch::<S>(&service, &system_facade, envelope, wait_for_service).await;
+                                dispatch::<S>(&service, &system_facade, envelope, wait_for_service)
+                                    .await;
                             }
                         }
                     }

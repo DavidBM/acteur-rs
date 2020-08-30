@@ -1,40 +1,58 @@
 //! # Acteur Actor System
 //!
 //! An safe & opinionated actor-like framework written in Rust that just works. Simple, robust, fast, documented.
+//!
+//!<div align="center">
+//!   <!-- Crates version -->
+//!   <a href="https://crates.io/crates/acteur">
+//!     <img src="https://img.shields.io/crates/v/acteur.svg?style=flat-square"
+//!     alt="Crates.io version" />
+//!   </a>
+//!   <!-- docs.rs docs -->
+//!   <a href="https://docs.rs/acteur">
+//!     <img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square"
+//!       alt="docs.rs docs" />
+//!   </a>
+//! </div>
 //! 
 //! ## Status update
+//!
+//! #### Update 1: 
+//! So, I took some time to think about this framework and have intention to move it into business 
+//! logic + distributed framework. The idea is to make a framework that allows you to write identified 
+//! aggregates/models/actors without much burden.
 //! 
-//! So, I took some time to think about this framework and have intention to move it into business logic + distributed 
-//! framework. The idea is to make a framework that allows you to write identified aggregates/models/actors without 
-//! much burden.
-//! 
+//! #### Update 2: 
+//! I'm playing with raft and sled in order to implement the cluster part. You can it in the file 
+//! playing_with_raft.rs
+//!
 //! ## Motivation
-//! 
-//! Actors are cool. Many people write about them and Actix rules the benchmarks. But to write a backend system 
+//!
+//! Actors are cool. Many people write about them and Actix rules the benchmarks. But to write a backend system
 //! spawning several servers using actors is not easy. Actually, it bring many other complexities. But actors are
-//! not a bad abstraction, but they are a solution for concurrency, not for business logic organization. They 
-//! tangentially solve some problems and that is nice, but introduce others. So, this framework seeks to implement 
-//! a framework which implement something very similar to Actors but with many adaptations and niceties in order 
+//! not a bad abstraction, but they are a solution for concurrency, not for business logic organization. They
+//! tangentially solve some problems and that is nice, but introduce others. So, this framework seeks to implement
+//! a framework which implement something very similar to Actors but with many adaptations and niceties in order
 //! to write business logic.
-//! 
+//!
 //! Said that, Acteur is provably **not** the tool you want if:
-//! 
+//!
 //!  - You want to have a full ACID compliant system
 //!  - You want to fully follow the Actor model
-//!  - You need to scale to A LOT of traffic. In which case you will need more than one server. (I'm planning to 
+//!  - You need to scale to A LOT of traffic. In which case you will need more than one server. (I'm planning to
 //!  implement some multi-server clustering, but for now, only one server).
-//! 
+//!
 //! But it may help you if you want:
-//! 
-//!  - To have a database but not incur in the cost of READ, APPLY, SAVE, and instead you want to keep object 
+//!
+//!  - To have a database but not incur in the cost of READ, APPLY, SAVE, and instead you want to keep object
 //!  instances in RAM.
-//!  - You don't want to deal with optimistic concurrency and you want the messages to process one by one for each 
+//!  - You don't want to deal with optimistic concurrency and you want the messages to process one by one for each
 //!  ID, but concurrently between IDs.
-//!  - You want to make an backend for an online videogame with many entities interacting at the same time but don't 
+//!  - You want to make an backend for an online videogame with many entities interacting at the same time but don't
 //!  want to go all the way with ECS.
 //!
 //! ## Main features of Acteur
-//! 
+//!
 //! This actor system is a bit different than other frameworks. It work under the following premises:
 //!  - **High-level**: The framework is oriented to map business logic rather than task concurrency.
 //!  - **Simple**: The API should be small, simple and intuitive. No surprises.
@@ -81,30 +99,30 @@
 //!
 //! For Actors you have two traits in order to handle messages:
 //!
-//! - [Receive](./trait.Receive.html): Receives a message without responding to it. The most 
+//! - [Receive](./trait.Receive.html): Receives a message without responding to it. The most
 //! efficient way to handle messages.
-//! - [Respond](./trait.Respond.html): Receives a message and allows to respond to it. Forces 
+//! - [Respond](./trait.Respond.html): Receives a message and allows to respond to it. Forces
 //! to sender to await until the actor respond.
 //!
 //! For Services you have other two traits.
 //!
-//! - [Listen](./trait.Listen.html): Receives a message without responding to it. The most efficient way 
+//! - [Listen](./trait.Listen.html): Receives a message without responding to it. The most efficient way
 //! to handle messages.
-//! - [Serve](./trait.Serve.html): Receives a message and allows to respond to it. Forces to sender to 
+//! - [Serve](./trait.Serve.html): Receives a message and allows to respond to it. Forces to sender to
 //! await until the actor respond.
 //!
 //! ### Why are you using 4 different trait instead of 1 or 2?
-//! 
+//!
 //! I tried to merge Traits but I didn't find how to do it because:
-//! 
-//! A) The handle method contains the ActorAssistant and ServiceAssistant types in the signatures, 
+//!
+//! A) The handle method contains the ActorAssistant and ServiceAssistant types in the signatures,
 //! witch have different types.
 //! B) I don't like to create a response channel for EVERY message when many messages don't need a response.
-//! 
+//!
 //! Both blocks make 4 combinations. Receive/Respond for Actors and Listen/Serve for Services.
-//! 
-//! I'm still trying to improve the naming and ergonomics. I think the concept will remain, but the ergonomics may change a bit. 
-//! 
+//!
+//! I'm still trying to improve the naming and ergonomics. I think the concept will remain, but the ergonomics may change a bit.
+//!
 //! ## Actors vs Services
 //!
 //! Acteur provides 2 ways of concurrency. Actors and Services.
@@ -124,7 +142,7 @@
 //! how many instances of the Service there will be (Acteur provides a default). Services can
 //! or can't have an State, but if they have, they require to be Sync (aka Mutex<state>).
 //!
-//! In short. Services are more like normal Actors (or, you can think as normal web services) 
+//! In short. Services are more like normal Actors (or, you can think as normal web services)
 //! but with some preset concurrency factor. You can have many instances and there is
 //! no synchronization of any type when consuming messages. Think of them as the primitive you
 //! use when you want to create something that doesn't fit the Actors model in this framework.
@@ -200,8 +218,8 @@
 //!
 //! Some things bothered me.
 //!
-//! 1. Actor systems are a concurrency level but I see example of them being used for business logic. Using a normal 
-//! HTTP framework + SQL feels more natural than using Actix. 
+//! 1. Actor systems are a concurrency level but I see example of them being used for business logic. Using a normal
+//! HTTP framework + SQL feels more natural than using Actix.
 //! 2. In order to use Actix you need to learn how it works. You need to manage the concurrency,
 //! the addresses, etc
 //! 3. Unsafe. I don't want unsafe. I wouldn't trust myself to do something like this in C++,
@@ -210,8 +228,8 @@
 //!
 //! After async_std 1.0 announcement and speaking with some friends I started to envision how I would
 //! like an actor framework be. Not that Actix and others are wrong, but they are too low level in my
-//! opinion and not for business logic. I wanted something that just runs without leaking so many underlying 
-//! concepts. At the same time I don't think that competing for the last nanosecond is healthy. Even less 
+//! opinion and not for business logic. I wanted something that just runs without leaking so many underlying
+//! concepts. At the same time I don't think that competing for the last nanosecond is healthy. Even less
 //! if the framework is already super fast.
 //!
 //! ## Common patterns
@@ -238,24 +256,24 @@
 //!
 //! ```
 //! ## Safe Rust
-//! 
+//!
 //! No unsafe code was directly used in this crate. You can check in lib.rs the `#![deny(unsafe_code)]` line.
-//! 
+//!
 //! ## Contributing
-//! 
-//! First of all, I would be really happy if you decide to check the framework and contribute to it! Just open 
-//! an issue / pull request and we can check what you would like to implement. Check more about contributing in 
+//!
+//! First of all, I would be really happy if you decide to check the framework and contribute to it! Just open
+//! an issue / pull request and we can check what you would like to implement. Check more about contributing in
 //! here: [https://github.com/DavidBM/acteur-rs/blob/master/CONTRIBUTING.md]()
-//! 
+//!
 //! ## License
-//! 
+//!
 //! <sup>
 //! Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
 //! 2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
 //! </sup>
-//! 
+//!
 //! <br/>
-//! 
+//!
 //! <sub>
 //! Unless you explicitly state otherwise, any contribution intentionally submitted
 //! for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
@@ -269,6 +287,7 @@
 mod utils;
 mod actors;
 mod facade;
+mod playing_with_raft;
 mod services;
 mod system_director;
 
@@ -278,6 +297,6 @@ pub use actors::actor::Actor;
 pub use actors::assistant::ActorAssistant;
 pub use actors::handle::{Receive, Respond};
 
+pub use services::handle::{Listen, Serve};
 pub use services::service::{Service, ServiceConcurrency, ServiceConfiguration};
 pub use services::system_facade::ServiceAssistant;
-pub use services::handle::{Listen, Serve};

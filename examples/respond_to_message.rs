@@ -31,7 +31,11 @@ struct SalaryChanged(u32);
 impl Respond<SalaryChanged> for Employee {
     type Response = String;
 
-    async fn handle(&mut self, message: SalaryChanged, assistant: &ActorAssistant<Employee>) -> String {
+    async fn handle(
+        &mut self,
+        message: SalaryChanged,
+        assistant: &ActorAssistant<Employee>,
+    ) -> String {
         // This doesn't make much sense as you can just `self.salary = message.0;` here,
         // but we want to show how you can implement Receive and Response trait for the
         // same message.

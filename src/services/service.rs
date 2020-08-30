@@ -58,15 +58,15 @@ pub trait Service: Sized + Send + Sync + Debug + 'static {
 }
 
 /// Defined the concurrency from the Service.
-/// 
+///
 /// In the majority of cases you may want to use "Automatic".
 #[derive(Debug)]
 pub enum ServiceConcurrency {
     /// This mode will check the size of your struct.
-    /// 
+    ///
     /// If the size is 0, it will assume Unlimited concurrency as there shouldn't be any synchronization between
     /// handler executions.
-    /// 
+    ///
     /// If the size is not 0, it will Asume OnePerCore
     Automatic,
     /// only one message processed at a time.
@@ -77,14 +77,14 @@ pub enum ServiceConcurrency {
     OneEachTwoCore,
     /// creates a fixed number of loops, efectively allowing a fixed concurrency.
     Fixed(usize),
-    /// In this mode the only one loop will be spawned, but it won't await the service handler, instead it will spawn 
-    /// a concurrent task that will be executed whenever is possible. 
+    /// In this mode the only one loop will be spawned, but it won't await the service handler, instead it will spawn
+    /// a concurrent task that will be executed whenever is possible.
     Unlimited,
 }
 
 /// Defines the service configuration. For now it only contains the concurrency parameters.
-/// 
-/// This struct implements the Default trait. You can call it with `ServiceConfiguration::default()` and 
+///
+/// This struct implements the Default trait. You can call it with `ServiceConfiguration::default()` and
 /// it should work well for the most of the cases..
 pub struct ServiceConfiguration {
     pub concurrency: ServiceConcurrency,

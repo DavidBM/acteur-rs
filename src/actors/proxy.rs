@@ -132,7 +132,7 @@ fn actor_loop<A: Actor>(
                         envelope.dispatch(&mut actor, &assistant).await
                     }
                     // The end process is a bit complicated. We don't want that if a End message
-                    // is issued at the same time that someone else is sending a message we end 
+                    // is issued at the same time that someone else is sending a message we end
                     // processing messages out of order, or in parallel, or not at all.
                     //
                     // Example: End is received, actor is removed from the HashMap. At the same time
@@ -197,10 +197,10 @@ fn actor_loop<A: Actor>(
                         }
                     }
                     Ok(Err(_)) => {
-                        // TODO: The next comment is not fully right as seems that since async_std 
+                        // TODO: The next comment is not fully right as seems that since async_std
                         // changed their channels in order to return an Result instead of an Option
                         // other type of errors can happen.
-                        // 
+                        //
                         // `None` indicates that the channel is disconnected. In this case
                         // we end the actor proxy.
                         sender.send(ActorProxyCommand::End).await;

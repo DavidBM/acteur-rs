@@ -9,7 +9,7 @@ use std::fmt::Debug;
 /// If you want to respond to messages, use the [Respond trait](./trait.Respond.html).
 ///
 /// This trait is compatible with [Respond trait](./trait.Respond.html) as you can implement, for the same message,
-/// both traits. This trait will be executed when using the "send_to_actor" or "send_to_actor_sync" method from System 
+/// both traits. This trait will be executed when using the "send_to_actor" or "send_to_actor_sync" method from System
 /// or the "send_to_actor" method from ActorAssistant.
 ///
 /// ```rust,no_run
@@ -82,7 +82,7 @@ where
 ///
 /// ## Note about concurrency and performance
 ///
-/// If there is no reason to respond to a message, prefer to use the [Receive trait](./trait.Receive.html) trait, as 
+/// If there is no reason to respond to a message, prefer to use the [Receive trait](./trait.Receive.html) trait, as
 /// this may delay you Actors or even deadlock them. For example:
 ///
 ///  1. Actor A-51 calls Actor B-32
