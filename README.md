@@ -218,7 +218,7 @@
 
  ## Why another Actors framework?
 
- Some things bothered me.
+ Somethings bothered me.
 
  1. Actor systems are a concurrency level but I see example of them being used for business logic. Using a normal
  HTTP framework + SQL feels more natural than using Actix.
@@ -256,7 +256,8 @@
  // You can clone and send it to another thread/struct
  let acteur2 = acteur.clone();
 
- ```rust
+ ``` 
+ 
  ## Safe Rust
 
  No unsafe code was directly used in this crate. You can check in lib.rs the `#![deny(unsafe_code)]` line.
