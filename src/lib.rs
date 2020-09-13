@@ -288,7 +288,6 @@
 mod utils;
 mod actors;
 mod facade;
-mod playing_with_raft;
 mod services;
 mod system_director;
 
