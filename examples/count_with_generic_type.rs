@@ -40,7 +40,7 @@ struct TestActor<T> {
 }
 
 #[async_trait]
-impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug> Actor for TestActor<T> {
+impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug + Default> Actor for TestActor<T> {
     type Id = T;
 
     async fn activate(id: Self::Id, _: &ActorAssistant<Self>) -> Self {
@@ -58,7 +58,7 @@ impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug> Actor for TestActor<T
 
 /// The only missing piece for shortening this would be: https://github.com/rust-lang/rust/issues/13231
 #[async_trait]
-impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug> Receive<TestMessage> for TestActor<T> {
+impl<T: 'static + Hash + Clone + Eq + Sync + Send + Debug + Default> Receive<TestMessage> for TestActor<T> {
     async fn handle(&mut self, message: TestMessage, assistant: &ActorAssistant<TestActor<T>>) {
         /*println!(
             "I'm actor {:?} and I'm sending a message for actor {:?}",

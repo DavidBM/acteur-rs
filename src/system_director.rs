@@ -53,6 +53,13 @@ impl SystemDirector {
         self.actors_director.send::<A, M>(actor_id, message).await
     }
 
+    pub async fn send_to_all_actors<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
+        self.actors_director.send_to_all::<A, M>(message).await
+    }
+
     pub async fn call_actor<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,

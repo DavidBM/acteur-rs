@@ -48,7 +48,7 @@ use std::hash::Hash;
 pub trait Actor: Sized + Debug + Send + Sync + 'static {
     /// The Id type for the actor.
     /// This Id will be used to identify the actor internally.
-    type Id: Eq + Hash + Send + Sync + Clone + Debug;
+    type Id: Eq + Hash + Send + Sync + Clone + Debug + Default;
 
     /// This method will be called automatically when the actor is activated.
     /// Normally, actors are activated when the first message is received.

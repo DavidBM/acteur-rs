@@ -87,6 +87,18 @@ impl ActorsDirector {
             .await;
     }
 
+    pub(crate) async fn send_to_all<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
+        self.get_or_create_manager_sender::<A>()
+            .await
+            .send(ActorManagerProxyCommand::DispatchToAll(Box::new(
+                ManagerLetter::new(Default::default(), message),
+            )))
+            .await;
+    }
+
     pub(crate) async fn call<A: Actor + Respond<M>, M: Debug + Send + 'static>(
         &self,
         actor_id: A::Id,

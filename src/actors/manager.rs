@@ -28,6 +28,7 @@ pub(crate) trait Manager: Send + Sync + Debug {
 #[derive(Debug)]
 pub(crate) enum ActorManagerProxyCommand<A: Actor> {
     Dispatch(Box<dyn ManagerEnvelope<Actor = A>>),
+    DispatchToAll(Box<dyn ManagerEnvelope<Actor = A>>),
     EndActor(A::Id),
 }
 
@@ -169,6 +170,13 @@ async fn actor_manager_loop<'a, A: Actor>(
                 )
                 .await;
             }
+            ActorManagerProxyCommand::DispatchToAll(command) => {
+                process_dispatch_all_command(
+                    command,
+                    &actors
+                )
+                .await;
+            }
             ActorManagerProxyCommand::EndActor(actor_id) => {
                 process_end_actor_command(actor_id, &actors).await;
             }
@@ -216,6 +224,15 @@ async fn process_dispatch_command<'a, A: Actor>(
     }
 
     actors.insert(actor_id, actor);
+}
+
+async fn process_dispatch_all_command<'a, A: Actor>(
+    mut command: Box<dyn ManagerEnvelope<Actor = A>>,
+    actors: &'a Arc<DashMap<A::Id, ActorProxy<A>>>,
+) {
+    for mut actor in actors.iter_mut() {
+        command.deliver(&mut actor).await;
+    }
 }
 
 impl<A: Actor> Clone for ActorsManager<A> {

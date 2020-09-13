@@ -62,6 +62,29 @@ impl Acteur {
         task::block_on(async move { self.send_to_actor::<A, M>(actor_id, message).await })
     }
 
+    /// Sends a message to all actors of a type independently of their ID
+    /// 
+    /// This method will execute the [Receive::handle](./trait.Receive.html) implemented for
+    /// that Message and Actor.
+    ///
+    /// This method will only affect to actors already loaded in Ram
+    pub async fn send_to_all_actors<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
+        self.system_director
+            .send_to_all_actors::<A, M>(message)
+            .await;
+    }
+
+    /// Same as `send_to_all_actors` method, but sync version.
+    pub async fn send_to_all_actors_sync<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
+        task::block_on(async move { self.send_to_all_actors_sync::<A, M>(message).await })
+    }
+
     /// As send_to_actor method, it sends a message to an actor with an ID but this one
     /// wait for a response from the actor.
     ///
