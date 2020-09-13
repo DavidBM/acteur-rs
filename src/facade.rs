@@ -62,8 +62,33 @@ impl Acteur {
         task::block_on(async move { self.send_to_actor::<A, M>(actor_id, message).await })
     }
 
+    /// Same as `send_to_actor` but it delays the message sending
+    pub async fn schedule_send_to_actor<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        duration: std::time::Duration,
+        message: M,
+    ) {
+        self.system_director
+            .schedule_send_to_actor::<A, M>(actor_id, duration, message)
+            .await;
+    }
+
+    /// Same as `schedule_send_to_actor` method, but sync version.
+    pub fn schedule_send_to_actor_sync<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        duration: std::time::Duration,
+        message: M,
+    ) {
+        task::block_on(async move {
+            self.schedule_send_to_actor::<A, M>(actor_id, duration, message)
+                .await
+        })
+    }
+
     /// Sends a message to all actors of a type independently of their ID
-    /// 
+    ///
     /// This method will execute the [Receive::handle](./trait.Receive.html) implemented for
     /// that Message and Actor.
     ///
@@ -82,7 +107,33 @@ impl Acteur {
         &self,
         message: M,
     ) {
-        task::block_on(async move { self.send_to_all_actors_sync::<A, M>(message).await })
+        task::block_on(async move { self.send_to_all_actors::<A, M>(message).await })
+    }
+
+    /// Same as `send_to_all_actors` but it delays the message sending
+    pub async fn schedule_send_to_all_actors<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        duration: std::time::Duration,
+        message: M,
+    ) {
+        self.system_director
+            .schedule_send_to_all_actors::<A, M>(duration, message)
+            .await;
+    }
+
+    /// Same as `schedule_send_to_all_actors` method, but sync version.
+    pub async fn schedule_send_to_all_actors_sync<
+        A: Actor + Receive<M>,
+        M: Debug + Send + 'static,
+    >(
+        &self,
+        duration: std::time::Duration,
+        message: M,
+    ) {
+        task::block_on(async move {
+            self.schedule_send_to_all_actors::<A, M>(duration, message)
+                .await
+        })
     }
 
     /// As send_to_actor method, it sends a message to an actor with an ID but this one

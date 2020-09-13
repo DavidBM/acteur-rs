@@ -73,6 +73,37 @@ impl<S: Service> ServiceAssistant<S> {
             .await
     }
 
+    /// Sends a message to all actors of a type, independently of the ID.
+    /// It will only send messages to actors already in Ram (already loaded)
+    pub async fn send_to_all_actors<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        message: M,
+    ) {
+        self.system_director.send_to_all_actors::<A, M>(message).await
+    }
+
+
+    /// Schedules to sends a message to the Actor with the specified Id.
+    /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
+    pub async fn schedule_send_to_actor<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        actor_id: A::Id,
+        duration: std::time::Duration,
+        message: M,
+    ) {
+        self.system_director.schedule_send_to_actor::<A, M>(actor_id, duration, message).await
+    }
+
+    /// Schedules to sends a message to all actor of a type, independently of the ID.
+    /// It will only send messages to actors already in Ram (already loaded)
+    pub async fn schedule_send_to_all_actors<A: Actor + Receive<M>, M: Debug + Send + 'static>(
+        &self,
+        duration: std::time::Duration,
+        message: M,
+    ) {
+        self.system_director.schedule_send_to_all_actors::<A, M>(duration, message).await
+    }
+
     /// Sends a message to the Actor with the specified Id and waits the actor's response .
     /// If the Actor is not loaded, it will load the actor before, calling its method `activate`
     pub async fn call_actor<A: Actor + Respond<M>, M: Debug + Send + 'static>(
