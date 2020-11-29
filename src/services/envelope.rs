@@ -3,7 +3,7 @@ use crate::services::handle::Listen;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
 use crate::services::system_facade::ServiceAssistant;
-use async_std::sync::Sender;
+use async_channel::Sender;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -74,7 +74,7 @@ impl<S: Service + Serve<M>, M: Debug> ServiceLetterWithResponders<S, M> {
         if let Some(message) = self.message.take() {
             if let Some(responder) = self.responder.take() {
                 let result = <S as Serve<M>>::handle(service, message, system).await;
-                responder.send(result).await;
+                let _ = responder.send(result).await;
             }
         }
     }

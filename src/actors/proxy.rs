@@ -3,11 +3,8 @@ use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::actors::manager::ActorsManager;
 use crate::system_director::SystemDirector;
 use crate::{Actor, ActorAssistant, Receive, Respond};
-use async_std::{
-    future,
-    sync::{channel, Receiver, Sender},
-    task,
-};
+use async_channel::{unbounded as channel, Receiver, Sender};
+use async_std::{future, task};
 use dashmap::mapref::entry::Entry::Occupied;
 use std::fmt::Debug;
 use std::time::Duration;
@@ -39,7 +36,7 @@ impl<A: Actor> ActorProxy<A> {
         innactivity_duration_until_end: Duration,
     ) -> ActorProxy<A> {
         let (sender, receiver): (Sender<ActorProxyCommand<A>>, Receiver<ActorProxyCommand<A>>) =
-            channel(5);
+            channel();
 
         let assistant = ActorAssistant::new(system_director, actors_director, id.clone());
 
@@ -68,7 +65,8 @@ impl<A: Actor> ActorProxy<A> {
         let message = Letter::<A, M>::new(message);
 
         // TODO: Handle the channel disconnection properly
-        self.sender
+        let _ = self
+            .sender
             .send(ActorProxyCommand::Dispatch(Box::new(message)))
             .await;
     }
@@ -86,7 +84,8 @@ impl<A: Actor> ActorProxy<A> {
         let message = LetterWithResponder::<A, M>::new(message, responder);
 
         // TODO: Handle the channel disconnection properly
-        self.sender
+        let _ = self
+            .sender
             .send(ActorProxyCommand::Dispatch(Box::new(message)))
             .await;
     }
@@ -109,7 +108,7 @@ impl<A: Actor> ActorProxy<A> {
     pub fn end(&self) {
         let sender = self.sender.clone();
         task::spawn(async move {
-            sender.send(ActorProxyCommand::End).await;
+            let _ = sender.send(ActorProxyCommand::End).await;
         });
     }
 }
@@ -171,7 +170,7 @@ fn actor_loop<A: Actor>(
                                         // We stop blocking the entry as we will continue receiving messages
                                         drop(entry);
                                         // We postpone the ending of the actor
-                                        sender.send(ActorProxyCommand::End).await;
+                                        let _ = sender.send(ActorProxyCommand::End).await;
                                         // and process the found message
                                         envelope.dispatch(&mut actor, &assistant).await
                                     }
@@ -190,7 +189,7 @@ fn actor_loop<A: Actor>(
                             }
                             Some(ActorProxyCommand::Dispatch(mut envelope)) => {
                                 // If there are any message left, we postpone the shutdown.
-                                sender.send(ActorProxyCommand::End).await;
+                                let _ = sender.send(ActorProxyCommand::End).await;
                                 // and process the found message
                                 envelope.dispatch(&mut actor, &assistant).await
                             }
@@ -203,12 +202,12 @@ fn actor_loop<A: Actor>(
                         //
                         // `None` indicates that the channel is disconnected. In this case
                         // we end the actor proxy.
-                        sender.send(ActorProxyCommand::End).await;
+                        let _ = sender.send(ActorProxyCommand::End).await;
                     }
                     Err(_) => {
                         // This indicated timeout waiting for messages. In such case, we end
                         // the actor proxy
-                        sender.send(ActorProxyCommand::End).await;
+                        let _ = sender.send(ActorProxyCommand::End).await;
                     }
                 }
             }

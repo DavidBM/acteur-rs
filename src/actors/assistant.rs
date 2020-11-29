@@ -121,7 +121,9 @@ impl<A: Actor> ActorAssistant<A> {
         duration: std::time::Duration,
         message: M,
     ) {
-        self.system_director.schedule_send_to_actor::<A2, M>(actor_id, duration, message).await
+        self.system_director
+            .schedule_send_to_actor::<A2, M>(actor_id, duration, message)
+            .await
     }
 
     /// Schedules to sends a message to all actors independently of the ID.
@@ -131,7 +133,9 @@ impl<A: Actor> ActorAssistant<A> {
         duration: std::time::Duration,
         message: M,
     ) {
-        self.system_director.schedule_send_to_all_actors::<A2, M>(duration, message).await
+        self.system_director
+            .schedule_send_to_all_actors::<A2, M>(duration, message)
+            .await
     }
 
     /// Sends a message to the Actor with the specified Id and waits the actor's response .

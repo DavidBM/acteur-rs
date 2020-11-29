@@ -4,11 +4,9 @@ use crate::services::envelope::ServiceEnvelope;
 use crate::services::service::{Service, ServiceConcurrency};
 use crate::services::system_facade::ServiceAssistant;
 use crate::system_director::SystemDirector;
+use async_channel::{unbounded as channel, Receiver, Sender};
 use async_std::sync::Mutex;
-use async_std::{
-    sync::{channel, Arc, Receiver, Sender},
-    task,
-};
+use async_std::{sync::Arc, task};
 use dashmap::mapref::entry::Entry::Occupied;
 use std::any::Any;
 use std::any::TypeId;
@@ -87,7 +85,7 @@ impl<S: Service> ServiceManager<S> {
         let mut receivers = Vec::new();
 
         for _ in 0..concurrency {
-            let (sender, receiver) = channel::<ServiceManagerCommand<S>>(150_000);
+            let (sender, receiver) = channel::<ServiceManagerCommand<S>>();
             senders.push(sender);
             receivers.push(receiver);
         }
@@ -148,7 +146,9 @@ impl<S: Service> ServiceManager<S> {
         for sender in self.senders.iter() {
             let sender = sender.clone();
             task::spawn(async move {
-                sender.send(ServiceManagerCommand::End).await;
+                // The channel is unbounded and it is ok if it is closed.
+                // That is the reason for ignoring the error
+                let _ = sender.send(ServiceManagerCommand::End).await;
             });
         }
     }
@@ -198,7 +198,7 @@ fn service_loop<S: Service>(
                                     // If there are more messages, we requeue the end and process the message.
                                     Some(ServiceManagerCommand::Dispatch(envelope)) => {
                                         drop(entry);
-                                        sender.send(ServiceManagerCommand::End).await;
+                                        let _ = sender.send(ServiceManagerCommand::End).await;
                                         dispatch::<S>(
                                             &service,
                                             &system_facade,
@@ -228,7 +228,7 @@ fn service_loop<S: Service>(
                                 }
                             }
                             Some(ServiceManagerCommand::Dispatch(envelope)) => {
-                                sender.send(ServiceManagerCommand::End).await;
+                                let _ = sender.send(ServiceManagerCommand::End).await;
                                 dispatch::<S>(&service, &system_facade, envelope, wait_for_service)
                                     .await;
                             }

@@ -6,7 +6,8 @@ use crate::services::handle::Serve;
 use crate::services::manager::{Manager, ServiceManager, ServiceManagerCommand};
 use crate::system_director::SystemDirector;
 use crate::Service;
-use async_std::sync::{channel, Arc, Mutex, Sender};
+use async_channel::{bounded as channel, Sender};
+use async_std::sync::{Arc, Mutex};
 use dashmap::mapref::one::RefMut;
 use dashmap::{mapref::entry::Entry, DashMap};
 use futures::task::AtomicWaker;
@@ -88,7 +89,8 @@ impl ServicesDirector {
     }
 
     pub(crate) async fn send<S: Service + Listen<M>, M: Debug + Send + 'static>(&self, message: M) {
-        self.get_or_create_manager_sender::<S>()
+        let _ = self
+            .get_or_create_manager_sender::<S>()
             .await
             .send(ServiceManagerCommand::Dispatch(Box::new(
                 Letter::new_for_service(message),
@@ -103,7 +105,8 @@ impl ServicesDirector {
     ) -> Result<<A as Serve<M>>::Response, &str> {
         let (sender, receiver) = channel::<<A as Serve<M>>::Response>(1);
 
-        self.get_or_create_manager_sender::<A>()
+        let _ = self
+            .get_or_create_manager_sender::<A>()
             .await
             .send(ServiceManagerCommand::Dispatch(Box::new(
                 ServiceLetterWithResponders::new(message, sender),

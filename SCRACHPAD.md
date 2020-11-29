@@ -21,6 +21,7 @@
 - □ Develop a way to kill an actor without processing all the queued messages and send the queued messages later (kind of, this actor is broken, stop, reload the actor, continue processing)
 - □ Allow to move actors from different Acteur instances
 - □ Allow to have actors that should never be deallocated. 
+- □ Now that we are using async_channel, which can fail when sending to closed channels we can simplify the algorithm.
 
 # Notes
 

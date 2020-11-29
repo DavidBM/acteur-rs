@@ -3,7 +3,8 @@ use crate::actors::manager::{ActorManagerProxyCommand, ActorsManager, Manager};
 use crate::actors::proxy::ActorReport;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
-use async_std::sync::{channel, Arc, Mutex, Sender};
+use async_channel::{bounded as channel, Sender};
+use async_std::sync::{Arc, Mutex};
 use dashmap::{mapref::entry::Entry, DashMap};
 use futures::task::AtomicWaker;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
@@ -79,7 +80,8 @@ impl ActorsDirector {
         actor_id: A::Id,
         message: M,
     ) {
-        self.get_or_create_manager_sender::<A>()
+        let _ = self
+            .get_or_create_manager_sender::<A>()
             .await
             .send(ActorManagerProxyCommand::Dispatch(Box::new(
                 ManagerLetter::new(actor_id, message),
@@ -91,7 +93,8 @@ impl ActorsDirector {
         &self,
         message: M,
     ) {
-        self.get_or_create_manager_sender::<A>()
+        let _ = self
+            .get_or_create_manager_sender::<A>()
             .await
             .send(ActorManagerProxyCommand::DispatchToAll(Box::new(
                 ManagerLetter::new(Default::default(), message),
@@ -107,7 +110,8 @@ impl ActorsDirector {
     ) -> Result<<A as Respond<M>>::Response, &str> {
         let (sender, receiver) = channel::<<A as Respond<M>>::Response>(1);
 
-        self.get_or_create_manager_sender::<A>()
+        let _ = self
+            .get_or_create_manager_sender::<A>()
             .await
             .send(ActorManagerProxyCommand::Dispatch(Box::new(
                 ManagerLetterWithResponder::new(actor_id, message, sender),
@@ -118,7 +122,8 @@ impl ActorsDirector {
     }
 
     pub(crate) async fn stop_actor<A: Actor>(&self, actor_id: A::Id) {
-        self.get_or_create_manager_sender::<A>()
+        let _ = self
+            .get_or_create_manager_sender::<A>()
             .await
             .send(ActorManagerProxyCommand::EndActor(actor_id))
             .await;

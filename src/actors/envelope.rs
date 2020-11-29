@@ -1,7 +1,7 @@
 use crate::actors::handle::Respond;
 use crate::actors::proxy::ActorProxy;
 use crate::{Actor, ActorAssistant, Receive};
-use async_std::sync::Sender;
+use async_channel::Sender;
 use async_trait::async_trait;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -141,7 +141,7 @@ impl<A: Respond<M> + Actor, M: Debug> LetterWithResponder<A, M> {
     pub async fn dispatch(&mut self, actor: &mut A, assistant: &ActorAssistant<A>) {
         if let Some(message) = self.message.take() {
             let response = <A as Respond<M>>::handle(actor, message, assistant).await;
-            self.responder.send(response).await;
+            let _ = self.responder.send(response).await;
         }
     }
 }

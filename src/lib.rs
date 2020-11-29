@@ -14,16 +14,16 @@
 //!       alt="docs.rs docs" />
 //!   </a>
 //! </div>
-//! 
+//!
 //! ## Status update
 //!
-//! #### Update 1: 
-//! So, I took some time to think about this framework and have intention to move it into business 
-//! logic + distributed framework. The idea is to make a framework that allows you to write identified 
+//! #### Update 1:
+//! So, I took some time to think about this framework and have intention to move it into business
+//! logic + distributed framework. The idea is to make a framework that allows you to write identified
 //! aggregates/models/actors without much burden.
-//! 
-//! #### Update 2: 
-//! I'm playing with raft and sled in order to implement the cluster part. You can it in the file 
+//!
+//! #### Update 2:
+//! I'm playing with raft and sled in order to implement the cluster part. You can it in the file
 //! playing_with_raft.rs
 //!
 //! ## Motivation
@@ -212,13 +212,13 @@
 //!     sys.wait_until_stopped();
 //! }
 //!
-//! ``` 
+//! ```
 //!
 //! ## Why another Actors framework?
 //!
 //! Somethings bothered me.
 //!
-//! 1. Actor systems are a concurrency level but I see example of them being used for business logic. Using 
+//! 1. Actor systems are a concurrency level but I see example of them being used for business logic. Using
 //! a normal HTTP framework + SQL feels more natural than using Actix.
 //! 2. In order to use Actix you need to learn how it works. You need to manage the concurrency,
 //! the addresses, etc
@@ -254,28 +254,28 @@
 //! // You can clone and send it to another thread/struct
 //! let acteur2 = acteur.clone();
 //!
-//! ``` 
-//! 
-//! If you need actors to query databases it would, generally, be a good idea to keep the database 
+//! ```
+//!
+//! If you need actors to query databases it would, generally, be a good idea to keep the database
 //! connection / pool in a service, where you can handle connection errors, reconnect in case of error
 //! and where you can control the concurrency.
-//! 
+//!
 //! ## Error handling
-//! 
+//!
 //! If you have operation that can error it is better if you encode them in services and reserve
-//! Actors to operations that cannot fail. For example, database connections, network connections, etc. 
-//! 
+//! Actors to operations that cannot fail. For example, database connections, network connections, etc.
+//!
 //! It is perfectly ok to encode a failure, from the point of view of the business rules, in an actor, for
-//! example, in a videogame, where a character cannot attack another character because the second is 
+//! example, in a videogame, where a character cannot attack another character because the second is
 //! invulnerable.
-//! 
-//! So, keep anything that can fail because external circumstances (network, hard drive, etc) in services 
+//!
+//! So, keep anything that can fail because external circumstances (network, hard drive, etc) in services
 //! and let actors to request the services for whatever they need.
-//! 
-//! If you have an error that should stop the application startup like database connections, add them to 
-//! a service construction and use the method `preload_service` for trying to start the service on the 
+//!
+//! If you have an error that should stop the application startup like database connections, add them to
+//! a service construction and use the method `preload_service` for trying to start the service on the
 //! app startup and let the app crash is something goes wrong.
-//! 
+//!
 //! ## Safe Rust
 //!
 //! No unsafe code was directly used in this crate. You can check in lib.rs the `#![deny(unsafe_code)]` line.

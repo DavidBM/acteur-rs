@@ -3,10 +3,8 @@ use crate::actors::envelope::ManagerEnvelope;
 use crate::actors::proxy::{ActorProxy, ActorReport};
 use crate::system_director::SystemDirector;
 use crate::Actor;
-use async_std::{
-    sync::{channel, Arc, Receiver, Sender},
-    task,
-};
+use async_channel::{unbounded as channel, Receiver, Sender};
+use async_std::{sync::Arc, task};
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::any::Any;
@@ -49,7 +47,7 @@ impl<A: Actor> ActorsManager<A> {
         innactivity_duration_until_end: Duration,
     ) -> ActorsManager<A> {
         // Channel in order to receive commands (like sending messages to actors, stopping, etc)
-        let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>(150_000);
+        let (sender, receiver) = channel::<ActorManagerProxyCommand<A>>();
 
         let actors = Arc::new(DashMap::new());
         let is_ending = Arc::new(AtomicBool::new(false));
@@ -171,11 +169,7 @@ async fn actor_manager_loop<'a, A: Actor>(
                 .await;
             }
             ActorManagerProxyCommand::DispatchToAll(command) => {
-                process_dispatch_all_command(
-                    command,
-                    &actors
-                )
-                .await;
+                process_dispatch_all_command(command, &actors).await;
             }
             ActorManagerProxyCommand::EndActor(actor_id) => {
                 process_end_actor_command(actor_id, &actors).await;
