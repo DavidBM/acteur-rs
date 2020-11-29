@@ -31,7 +31,7 @@ impl SystemDirector {
             services_director: services_director.clone(),
         };
 
-        let system_to_retur = system.clone();
+        let system_to_return = system.clone();
 
         block_on(async move {
             Arc::make_mut(&mut actors_director)
@@ -42,7 +42,7 @@ impl SystemDirector {
                 .await;
         });
 
-        system_to_retur
+        system_to_return
     }
 
     pub async fn send_to_actor<A: Actor + Receive<M>, M: Debug + Send + 'static>(

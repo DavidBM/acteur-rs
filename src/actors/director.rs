@@ -20,7 +20,7 @@ pub(crate) struct ActorsDirectorConfiguration {
     pub(crate) innactivity_seconds_until_actor_end: std::time::Duration,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ActorsDirector {
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
     // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
@@ -172,18 +172,6 @@ impl ActorsDirector {
         }
 
         statistics
-    }
-}
-
-impl Clone for ActorsDirector {
-    fn clone(&self) -> Self {
-        ActorsDirector {
-            managers: self.managers.clone(),
-            waker: self.waker.clone(),
-            is_stopping: self.is_stopping.clone(),
-            system: self.system.clone(),
-            configuration: self.configuration.clone(),
-        }
     }
 }
 
