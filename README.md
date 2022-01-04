@@ -17,16 +17,20 @@
    </a>
  </div>
  
- ## Status update
+ ## Status update [HELP WANTED]
+ 
+ #### Update 3: Help wanted
+ 
+ I'm not having time to continue with the development of this for the foreseen future. If anyone would like to take it from here, please, let me know!
+ 
+ #### Update 2: 
+ I'm playing with raft and sled in order to implement the cluster part. You can it in the file 
+ playing_with_raft.rs
 
  #### Update 1: 
  So, I took some time to think about this framework and have intention to move it into business 
  logic + distributed framework. The idea is to make a framework that allows you to write identified 
  aggregates/models/actors without much burden.
- 
- #### Update 2: 
- I'm playing with raft and sled in order to implement the cluster part. You can it in the file 
- playing_with_raft.rs
 
  ## Motivation
 
