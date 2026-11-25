@@ -58,7 +58,7 @@ impl<S: Service> ServiceManager<S> {
         // Controls if the loop waits for the service functions to finish.
         let mut wait_for_service = true;
 
-        let concurrency = match service_conf.concurrency {
+        let concurrency = (match service_conf.concurrency {
             ServiceConcurrency::Automatic => {
                 // If the structure is size 0 we can safely assume that there is no state / synchronization mechanisms,
                 // therefore we set the concurrency as unlimited.
@@ -79,7 +79,8 @@ impl<S: Service> ServiceManager<S> {
                 wait_for_service = false;
                 1
             }
-        };
+        })
+        .max(1);
 
         let mut senders = Vec::new();
         let mut receivers = Vec::new();

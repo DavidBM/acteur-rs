@@ -73,9 +73,9 @@ pub enum ServiceConcurrency {
     None,
     /// sets concurrency to the same number of cores
     OnePerCore,
-    /// sets concurrency to cores/2
+    /// sets concurrency to half the core count, with a minimum of one
     OneEachTwoCore,
-    /// creates a fixed number of loops, efectively allowing a fixed concurrency.
+    /// creates a fixed number of loops, with a minimum of one.
     Fixed(usize),
     /// In this mode the only one loop will be spawned, but it won't await the service handler, instead it will spawn
     /// a concurrent task that will be executed whenever is possible.
