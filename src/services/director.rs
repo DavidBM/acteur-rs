@@ -7,25 +7,19 @@ use crate::services::manager::{Manager, ServiceManager, ServiceManagerCommand};
 use crate::system_director::SystemDirector;
 use crate::Service;
 use async_channel::{bounded as channel, Sender};
-use async_std::sync::{Arc, Mutex};
+use async_lock::Mutex;
 use dashmap::mapref::one::RefMut;
 use dashmap::{mapref::entry::Entry, DashMap};
-use futures::task::AtomicWaker;
+use event_listener::Event;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-use std::{
-    any::TypeId,
-    fmt::Debug,
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::sync::Arc;
+use std::{any::TypeId, fmt::Debug};
 
 // TODO: This structure is getting big and with several responsiblities, maybe it should be splitted.
 #[derive(Debug)]
 pub(crate) struct ServicesDirector {
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
-    // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
-    waker: Arc<AtomicWaker>,
+    stopped: Arc<Event>,
     is_stopping: Arc<AtomicBool>,
     system: Arc<Mutex<Option<SystemDirector>>>,
     broker: Option<MessageBroker>,
@@ -35,7 +29,7 @@ impl ServicesDirector {
     pub(crate) fn new() -> ServicesDirector {
         let mut director = ServicesDirector {
             managers: Arc::new(DashMap::new()),
-            waker: Arc::new(AtomicWaker::new()),
+            stopped: Arc::new(Event::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
             system: Arc::new(Mutex::new(None)),
             broker: None,
@@ -117,7 +111,13 @@ impl ServicesDirector {
     }
 
     pub(crate) async fn wait_until_stopped(&self) {
-        ServicesDirectorStopAwaiter::new(self.clone()).await;
+        loop {
+            let listener = self.stopped.listen();
+            if self.is_stopping.load(Relaxed) && self.managers.is_empty() {
+                return;
+            }
+            listener.await;
+        }
     }
 
     pub(crate) async fn create_manager<S: Service>(&self) -> ServiceManager<S> {
@@ -131,12 +131,12 @@ impl ServicesDirector {
         ServiceManager::<S>::new(self.clone(), system, self.broker.as_ref().unwrap().clone()).await
     }
 
-    pub(crate) async fn signal_manager_removed(&self) {
+    pub(crate) fn signal_manager_removed(&self) {
         let is_stopping = self.is_stopping.load(Relaxed);
         let is_empty = self.managers.is_empty();
 
         if is_stopping && is_empty {
-            self.waker.wake();
+            self.stopped.notify(usize::MAX);
         }
     }
 
@@ -146,9 +146,13 @@ impl ServicesDirector {
         for manager in self.managers.iter() {
             manager.end();
         }
+        self.signal_manager_removed();
     }
 
-    pub(crate) fn get_blocking_manager_entry(&self, id: TypeId) -> Entry<TypeId, Box<dyn Manager>> {
+    pub(crate) fn get_blocking_manager_entry(
+        &self,
+        id: TypeId,
+    ) -> Entry<'_, TypeId, Box<dyn Manager>> {
         self.managers.entry(id)
     }
 
@@ -161,31 +165,10 @@ impl Clone for ServicesDirector {
     fn clone(&self) -> Self {
         ServicesDirector {
             managers: self.managers.clone(),
-            waker: self.waker.clone(),
+            stopped: self.stopped.clone(),
             is_stopping: self.is_stopping.clone(),
             system: self.system.clone(),
             broker: self.broker.clone(),
-        }
-    }
-}
-
-pub(crate) struct ServicesDirectorStopAwaiter(ServicesDirector);
-
-impl ServicesDirectorStopAwaiter {
-    pub fn new(waker: ServicesDirector) -> ServicesDirectorStopAwaiter {
-        ServicesDirectorStopAwaiter(waker)
-    }
-}
-
-impl Future for ServicesDirectorStopAwaiter {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        if !self.0.is_stopping.load(Relaxed) || !self.0.managers.is_empty() {
-            self.0.waker.register(cx.waker());
-            Poll::Pending
-        } else {
-            Poll::Ready(())
         }
     }
 }

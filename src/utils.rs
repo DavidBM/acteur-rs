@@ -1,4 +1,3 @@
-#[macro_use]
 macro_rules! recv_until_command_or_end {
     ($rec:expr, $end:pat) => {
         async {

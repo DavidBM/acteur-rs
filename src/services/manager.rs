@@ -1,3 +1,4 @@
+use crate::runtime as task;
 use crate::services::broker::MessageBroker;
 use crate::services::director::ServicesDirector;
 use crate::services::envelope::ServiceEnvelope;
@@ -5,14 +6,14 @@ use crate::services::service::{Service, ServiceConcurrency};
 use crate::services::system_facade::ServiceAssistant;
 use crate::system_director::SystemDirector;
 use async_channel::{unbounded as channel, Receiver, Sender};
-use async_std::sync::Mutex;
-use async_std::{sync::Arc, task};
+use async_lock::Mutex;
 use dashmap::mapref::entry::Entry::Occupied;
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 #[async_trait::async_trait]
@@ -220,7 +221,7 @@ fn service_loop<S: Service>(
                                             // We check agains 1 because fetch_sub returns the previous number.
                                             if previously_active <= 1 {
                                                 entry.remove();
-                                                director.signal_manager_removed().await;
+                                                director.signal_manager_removed();
                                             }
                                         }
 

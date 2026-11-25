@@ -1,16 +1,17 @@
 use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::ManagerEnvelope;
 use crate::actors::proxy::{ActorProxy, ActorReport};
+use crate::runtime as task;
 use crate::system_director::SystemDirector;
 use crate::Actor;
 use async_channel::{unbounded as channel, Receiver, Sender};
-use async_std::{sync::Arc, task};
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[async_trait::async_trait]
@@ -102,7 +103,7 @@ impl<A: Actor> ActorsManager<A> {
             // Remove the entry from the system HashMap
             entry.remove();
             // Signaling only when we really remove the manager.
-            self.actors_director.signal_manager_removed().await;
+            self.actors_director.signal_manager_removed();
         }
     }
 

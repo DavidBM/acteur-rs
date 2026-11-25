@@ -1,11 +1,10 @@
 [package]
 name = "acteur"
-version = "0.12.2"
+version = "1.0.0"
 authors = ["David Bonet <webbonet@gmail.com>"]
 edition = "2018"
 description = "A safe actor-like framework that just works. Simple, robust, fast, documented."
 license = "MIT OR Apache-2.0"
-homepage = "https://github.com/DavidBM/acteur-rs"
 repository = "https://github.com/DavidBM/acteur-rs"
 readme = "README.md"
 keywords = ["actor", "messages", "actors", "async", "system"]
@@ -16,9 +15,13 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 async-trait = "0.1"
-async-std = "1"
-dashmap = "3"
+async-global-executor = "3.1"
+async-io = "2"
+async-lock = "3"
+futures-lite = "2"
+event-listener = "5"
+dashmap = "6"
 futures = "0.3"
 lazy_static = "1"
 num_cpus = "1.13"
-async-channel = "1"
+async-channel = "2"
