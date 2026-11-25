@@ -1,9 +1,9 @@
 use crate::actors::director::ActorsDirector;
+use crate::runtime as task;
 use crate::services::handle::{Listen, Serve};
 use crate::services::service::Service;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
-use async_std::task;
 use std::fmt::Debug;
 
 /// This object is provided to the handle method in [Receive](./trait.Receive.html) and [Respond](./trait.Respond.html)

@@ -1,16 +1,17 @@
 use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::ManagerEnvelope;
 use crate::actors::proxy::{ActorProxy, ActorReport};
+use crate::runtime as task;
 use crate::system_director::SystemDirector;
 use crate::Actor;
 use async_channel::{unbounded as channel, Receiver, Sender};
-use async_std::{sync::Arc, task};
 use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[async_trait::async_trait]
@@ -19,8 +20,6 @@ pub(crate) trait Manager: Send + Sync + Debug {
     fn get_type_id(&self) -> TypeId;
     fn get_statistics(&self) -> ActorsManagerReport;
     fn get_sender_as_any(&self) -> Box<dyn Any>;
-    fn is_empty(&self) -> bool;
-    fn remove_actor(&self, actor_id: Box<dyn Any + Send>);
 }
 
 #[derive(Debug)]
@@ -102,7 +101,7 @@ impl<A: Actor> ActorsManager<A> {
             // Remove the entry from the system HashMap
             entry.remove();
             // Signaling only when we really remove the manager.
-            self.actors_director.signal_manager_removed().await;
+            self.actors_director.signal_manager_removed();
         }
     }
 
@@ -130,18 +129,10 @@ impl<A: Actor> ActorsManager<A> {
         report
     }
 
-    pub(crate) fn remove_actor(&self, actor_id: A::Id) {
-        self.actors.remove(&actor_id);
-    }
-
     /// Returns the Entry of the actorProxy in the general HashMap, making not possible to send any messages
     /// until the Entry is droped.
-    pub(crate) fn get_blocking_actor_entry(&self, id: A::Id) -> Entry<A::Id, ActorProxy<A>> {
+    pub(crate) fn get_blocking_actor_entry(&self, id: A::Id) -> Entry<'_, A::Id, ActorProxy<A>> {
         self.actors.entry(id)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.actors.is_empty() && self.sender.is_empty()
     }
 }
 
@@ -254,17 +245,7 @@ impl<A: Actor> Manager for ActorsManager<A> {
         ActorsManager::<A>::get_statistics(self)
     }
 
-    fn is_empty(&self) -> bool {
-        ActorsManager::<A>::is_empty(self)
-    }
-
     fn get_sender_as_any(&self) -> Box<dyn Any> {
         Box::new(ActorsManager::<A>::get_sender(self))
-    }
-
-    fn remove_actor(&self, actor_id: Box<dyn Any + Send>) {
-        if let Ok(actor_id) = actor_id.downcast::<A::Id>() {
-            ActorsManager::<A>::remove_actor(self, *actor_id)
-        }
     }
 }

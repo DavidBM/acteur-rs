@@ -1,3 +1,4 @@
+use crate::runtime as task;
 use crate::services::broker::MessageBroker;
 use crate::services::director::ServicesDirector;
 use crate::services::envelope::ServiceEnvelope;
@@ -5,28 +6,18 @@ use crate::services::service::{Service, ServiceConcurrency};
 use crate::services::system_facade::ServiceAssistant;
 use crate::system_director::SystemDirector;
 use async_channel::{unbounded as channel, Receiver, Sender};
-use async_std::sync::Mutex;
-use async_std::{sync::Arc, task};
+use async_lock::Mutex;
 use dashmap::mapref::entry::Entry::Occupied;
 use std::any::Any;
-use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::SystemTime;
+use std::sync::Arc;
 
 #[async_trait::async_trait]
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
-    fn get_type_id(&self) -> TypeId;
-    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + Send)>;
-    fn get_statistics(&self) -> ServiceReport;
-    fn clone(&self) -> Box<dyn Manager>;
-}
-
-pub struct ServiceReport {
-    pub last_message_on: SystemTime,
-    pub enqueued_messages: usize,
+    async fn get_sender_as_any(&mut self) -> Box<dyn Any + Send>;
 }
 
 #[derive(Debug)]
@@ -58,7 +49,7 @@ impl<S: Service> ServiceManager<S> {
         // Controls if the loop waits for the service functions to finish.
         let mut wait_for_service = true;
 
-        let concurrency = match service_conf.concurrency {
+        let concurrency = (match service_conf.concurrency {
             ServiceConcurrency::Automatic => {
                 // If the structure is size 0 we can safely assume that there is no state / synchronization mechanisms,
                 // therefore we set the concurrency as unlimited.
@@ -79,7 +70,8 @@ impl<S: Service> ServiceManager<S> {
                 wait_for_service = false;
                 1
             }
-        };
+        })
+        .max(1);
 
         let mut senders = Vec::new();
         let mut receivers = Vec::new();
@@ -219,7 +211,7 @@ fn service_loop<S: Service>(
                                             // We check agains 1 because fetch_sub returns the previous number.
                                             if previously_active <= 1 {
                                                 entry.remove();
-                                                director.signal_manager_removed().await;
+                                                director.signal_manager_removed();
                                             }
                                         }
 
@@ -257,26 +249,11 @@ async fn dispatch<'a, S: Service>(
 
 #[async_trait::async_trait]
 impl<S: Service> Manager for ServiceManager<S> {
-    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + Send + 'static)> {
+    async fn get_sender_as_any(&mut self) -> Box<dyn Any + Send> {
         Box::new(self.get_sender().await)
-    }
-    fn get_type_id(&self) -> TypeId {
-        std::any::TypeId::of::<S>()
     }
     fn end(&self) {
         self.end();
-    }
-
-    // TODO: Implement
-    fn get_statistics(&self) -> ServiceReport {
-        ServiceReport {
-            last_message_on: SystemTime::now(),
-            enqueued_messages: 10000,
-        }
-    }
-
-    fn clone(&self) -> Box<dyn Manager> {
-        Box::new(Clone::clone(self))
     }
 }
 

@@ -4,17 +4,12 @@ use crate::actors::proxy::ActorReport;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
 use async_channel::{bounded as channel, Sender};
-use async_std::sync::{Arc, Mutex};
+use async_lock::Mutex;
 use dashmap::{mapref::entry::Entry, DashMap};
-use futures::task::AtomicWaker;
+use event_listener::Event;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-use std::{
-    any::TypeId,
-    fmt::Debug,
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::sync::Arc;
+use std::{any::TypeId, fmt::Debug};
 
 #[derive(Debug)]
 pub(crate) struct ActorsDirectorConfiguration {
@@ -24,8 +19,7 @@ pub(crate) struct ActorsDirectorConfiguration {
 #[derive(Debug, Clone)]
 pub(crate) struct ActorsDirector {
     managers: Arc<DashMap<TypeId, Box<dyn Manager>>>,
-    // TODO: Should be a WakerSet as there may be more than one thread that wants to wait
-    waker: Arc<AtomicWaker>,
+    stopped: Arc<Event>,
     is_stopping: Arc<AtomicBool>,
     system: Arc<Mutex<Option<SystemDirector>>>,
     configuration: Arc<ActorsDirectorConfiguration>,
@@ -35,7 +29,7 @@ impl ActorsDirector {
     pub(crate) fn new(configuration: ActorsDirectorConfiguration) -> ActorsDirector {
         ActorsDirector {
             managers: Arc::new(DashMap::new()),
-            waker: Arc::new(AtomicWaker::new()),
+            stopped: Arc::new(Event::new()),
             is_stopping: Arc::new(AtomicBool::new(false)),
             system: Arc::new(Mutex::new(None)),
             configuration: Arc::new(configuration),
@@ -130,7 +124,13 @@ impl ActorsDirector {
     }
 
     pub(crate) async fn wait_until_stopped(&self) {
-        ActorsDirectorStopAwaiter::new(self.clone()).await;
+        loop {
+            let listener = self.stopped.listen();
+            if self.is_stopping.load(Relaxed) && self.managers.is_empty() {
+                return;
+            }
+            listener.await;
+        }
     }
 
     pub(crate) async fn create_manager<A: Actor>(&self) -> ActorsManager<A> {
@@ -148,12 +148,12 @@ impl ActorsDirector {
         )
     }
 
-    pub(crate) async fn signal_manager_removed(&self) {
+    pub(crate) fn signal_manager_removed(&self) {
         let is_stopping = self.is_stopping.load(Relaxed);
         let is_empty = self.managers.is_empty();
 
         if is_stopping && is_empty {
-            self.waker.wake();
+            self.stopped.notify(usize::MAX);
         }
     }
 
@@ -163,9 +163,13 @@ impl ActorsDirector {
         for manager in self.managers.iter() {
             manager.end();
         }
+        self.signal_manager_removed();
     }
 
-    pub(crate) fn get_blocking_manager_entry(&self, id: TypeId) -> Entry<TypeId, Box<dyn Manager>> {
+    pub(crate) fn get_blocking_manager_entry(
+        &self,
+        id: TypeId,
+    ) -> Entry<'_, TypeId, Box<dyn Manager>> {
         self.managers.entry(id)
     }
 
@@ -177,26 +181,5 @@ impl ActorsDirector {
         }
 
         statistics
-    }
-}
-
-pub(crate) struct ActorsDirectorStopAwaiter(ActorsDirector);
-
-impl ActorsDirectorStopAwaiter {
-    pub fn new(waker: ActorsDirector) -> ActorsDirectorStopAwaiter {
-        ActorsDirectorStopAwaiter(waker)
-    }
-}
-
-impl Future for ActorsDirectorStopAwaiter {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        if !self.0.is_stopping.load(Relaxed) || !self.0.managers.is_empty() {
-            self.0.waker.register(cx.waker());
-            Poll::Pending
-        } else {
-            Poll::Ready(())
-        }
     }
 }

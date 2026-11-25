@@ -1,12 +1,12 @@
 use crate::services::director::ServicesDirector;
 use crate::services::handle::Listen;
 use crate::services::service::Service;
-use async_std::sync::Arc;
 use dashmap::{mapref::entry::Entry, DashMap};
 use std::any::Any;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct MessageBroker {
@@ -53,7 +53,7 @@ impl MessageBroker {
 
 #[async_trait::async_trait]
 trait ServiceManagerPublish: Send + Sync {
-    async fn send(&mut self, message: Box<(dyn Any + Send)>, system_director: &ServicesDirector);
+    async fn send(&mut self, message: Box<dyn Any + Send>, system_director: &ServicesDirector);
 }
 
 #[derive(Debug)]
@@ -79,7 +79,7 @@ impl<S: Service + Listen<M>, M: Debug + Send + 'static> ServiceManagerWrapper<S,
 impl<S: Service + Listen<M>, M: Debug + Send + Sync + 'static> ServiceManagerPublish
     for ServiceManagerWrapper<S, M>
 {
-    async fn send(&mut self, message: Box<(dyn Any + Send)>, system_director: &ServicesDirector) {
+    async fn send(&mut self, message: Box<dyn Any + Send>, system_director: &ServicesDirector) {
         match message.downcast::<M>() {
             Ok(message) => {
                 ServiceManagerWrapper::send(self, *message, system_director).await;

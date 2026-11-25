@@ -7,10 +7,11 @@ use crate::services::director::ServicesDirector;
 use crate::services::handle::Listen;
 use crate::services::handle::Serve;
 use crate::services::service::Service;
-use async_std::{sync::Arc, task::block_on};
+use async_global_executor::block_on;
 use futures::join;
 use std::any::TypeId;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) struct SystemDirector {
@@ -59,7 +60,7 @@ impl SystemDirector {
         duration: std::time::Duration,
         message: M,
     ) {
-        async_std::task::sleep(duration).await;
+        async_io::Timer::after(duration).await;
         self.actors_director.send::<A, M>(actor_id, message).await
     }
 
@@ -75,7 +76,7 @@ impl SystemDirector {
         duration: std::time::Duration,
         message: M,
     ) {
-        async_std::task::sleep(duration).await;
+        async_io::Timer::after(duration).await;
         self.actors_director.send_to_all::<A, M>(message).await
     }
 
@@ -131,5 +132,32 @@ impl Clone for SystemDirector {
             actors_director: self.actors_director.clone(),
             services_director: self.services_director.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SystemDirector;
+    use crate::runtime::{block_on, timeout};
+    use futures::{join, pin_mut, poll};
+    use std::time::Duration;
+
+    #[test]
+    fn stopping_an_empty_system_wakes_all_waiters() {
+        block_on(async {
+            let system = SystemDirector::new();
+            let first = system.wait_until_stopped();
+            let second = system.wait_until_stopped();
+            pin_mut!(first, second);
+            assert!(poll!(first.as_mut()).is_pending());
+            assert!(poll!(second.as_mut()).is_pending());
+
+            system.stop().await;
+            timeout(Duration::from_secs(1), async {
+                join!(first, second);
+            })
+            .await
+            .expect("both shutdown waiters should be notified");
+        });
     }
 }

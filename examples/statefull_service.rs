@@ -1,5 +1,5 @@
 use acteur::{Acteur, Listen, Service, ServiceAssistant, ServiceConfiguration};
-use async_std::sync::Mutex;
+use async_lock::Mutex;
 
 #[derive(Debug)]
 struct EmployeeExpensesCalculator {

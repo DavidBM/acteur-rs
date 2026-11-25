@@ -61,7 +61,7 @@
 //!
 //! ### Regarding the implementation:
 //!
-//!  - Acteur is **asynchronous** and uses `async_std` under the hood.
+//!  - Acteur is **asynchronous** and runs its background tasks on `async-global-executor`.
 //!  - Actors have an *ID* which its type is defined by the developer.
 //!  - Messages are routed to an *Actor* and an *ID* .
 //!  - Actor life-cycle is *automatically* managed by the framework.
@@ -308,6 +308,7 @@
 mod utils;
 mod actors;
 mod facade;
+mod runtime;
 mod services;
 mod system_director;
 

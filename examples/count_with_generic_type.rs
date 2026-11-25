@@ -1,6 +1,5 @@
 use acteur::{Acteur, Actor, ActorAssistant, Receive};
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::SystemTime;
@@ -36,7 +35,6 @@ struct TestMessage {
 #[derive(Debug)]
 struct TestActor<T> {
     id: T,
-    values: HashMap<u64, String>,
 }
 
 #[async_trait]
@@ -44,11 +42,7 @@ impl<T: 'static + Send + Sync + Eq + Clone + Hash + Debug + Default> Actor for T
     type Id = T;
 
     async fn activate(id: Self::Id, _: &ActorAssistant<Self>) -> Self {
-        //
-        TestActor {
-            id,
-            values: std::collections::HashMap::new(),
-        }
+        TestActor { id }
     }
 
     async fn deactivate(&mut self) {

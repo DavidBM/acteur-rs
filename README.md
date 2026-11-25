@@ -32,6 +32,14 @@
  logic + distributed framework. The idea is to make a framework that allows you to write identified 
  aggregates/models/actors without much burden.
 
+ ## Running Acteur in a service
+
+ Use Acteur as an in-process dispatcher. Persist state that must survive restarts
+ in your application's storage. Choose service concurrency explicitly when
+ handlers depend on bounded downstream resources, and limit the rate at which
+ callers enqueue work. Stop producers and quiesce handlers before stopping the
+ system. `wait_until_stopped` waits for the actor and service managers to exit.
+
  ## Motivation
 
  Actors are cool. Many people write about them and Actix rules the benchmarks. But to write a backend system
@@ -67,7 +75,7 @@
 
  ### Regarding the implementation:
 
-  - Acteur is **asynchronous** and uses `async_std` under the hood.
+  - Acteur is **asynchronous** and runs its background tasks on `async-global-executor`.
   - Actors have an *ID* which its type is defined by the developer.
   - Messages are routed to an *Actor* and an *ID* .
   - Actor life-cycle is *automatically* managed by the framework.

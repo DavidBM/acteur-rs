@@ -1,10 +1,10 @@
 use crate::actors::director::ActorsDirector;
 use crate::actors::envelope::{Envelope, Letter, LetterWithResponder};
 use crate::actors::manager::ActorsManager;
+use crate::runtime as task;
 use crate::system_director::SystemDirector;
 use crate::{Actor, ActorAssistant, Receive, Respond};
 use async_channel::{unbounded as channel, Receiver, Sender};
-use async_std::{future, task};
 use dashmap::mapref::entry::Entry::Occupied;
 use std::fmt::Debug;
 use std::time::Duration;
@@ -126,7 +126,7 @@ fn actor_loop<A: Actor>(
 
         task::spawn(async move {
             loop {
-                match future::timeout(innactivity_duration_until_end, receiver.recv()).await {
+                match task::timeout(innactivity_duration_until_end, receiver.recv()).await {
                     Ok(Ok(ActorProxyCommand::Dispatch(mut envelope))) => {
                         envelope.dispatch(&mut actor, &assistant).await
                     }

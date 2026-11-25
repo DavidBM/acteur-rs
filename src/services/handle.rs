@@ -14,7 +14,7 @@ use std::fmt::Debug;
 ///
 /// ```rust,no_run
 /// use acteur::{Acteur, Service, Listen, ServiceAssistant, ServiceConfiguration};
-/// use async_std::sync::Mutex;
+/// use async_lock::Mutex;
 ///
 /// #[derive(Debug)]
 /// struct EmployeeExpensesCalculator {

@@ -1,9 +1,9 @@
 use crate::actors::proxy::ActorReport;
+use crate::runtime as task;
 use crate::services::handle::{Listen, Serve};
 use crate::services::service::Service;
 use crate::system_director::SystemDirector;
 use crate::{Actor, Receive, Respond};
-use async_std::task;
 use lazy_static::lazy_static;
 use std::any::TypeId;
 use std::fmt::Debug;
