@@ -28,9 +28,7 @@ struct EmployeeSalaryChange(f32);
 #[async_trait::async_trait]
 impl Listen<EmployeeSalaryChange> for EmployeeTaxesCalculator {
     async fn handle(&self, message: EmployeeSalaryChange, _: &ServiceAssistant<Self>) {
-        println!("Message received! {:?}", message);
-
-        // Calculate the tax rate and send it to however you want
+        println!("Estimated tax: {}", message.0 * self.tax_rate);
     }
 }
 

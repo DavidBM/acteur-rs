@@ -9,25 +9,15 @@ use async_channel::{unbounded as channel, Receiver, Sender};
 use async_lock::Mutex;
 use dashmap::mapref::entry::Entry::Occupied;
 use std::any::Any;
-use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 #[async_trait::async_trait]
 pub(crate) trait Manager: Send + Sync + Debug {
     fn end(&self);
-    fn get_type_id(&self) -> TypeId;
-    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + Send)>;
-    fn get_statistics(&self) -> ServiceReport;
-    fn clone(&self) -> Box<dyn Manager>;
-}
-
-pub struct ServiceReport {
-    pub last_message_on: SystemTime,
-    pub enqueued_messages: usize,
+    async fn get_sender_as_any(&mut self) -> Box<dyn Any + Send>;
 }
 
 #[derive(Debug)]
@@ -259,26 +249,11 @@ async fn dispatch<'a, S: Service>(
 
 #[async_trait::async_trait]
 impl<S: Service> Manager for ServiceManager<S> {
-    async fn get_sender_as_any(&mut self) -> Box<(dyn Any + Send + 'static)> {
+    async fn get_sender_as_any(&mut self) -> Box<dyn Any + Send> {
         Box::new(self.get_sender().await)
-    }
-    fn get_type_id(&self) -> TypeId {
-        std::any::TypeId::of::<S>()
     }
     fn end(&self) {
         self.end();
-    }
-
-    // TODO: Implement
-    fn get_statistics(&self) -> ServiceReport {
-        ServiceReport {
-            last_message_on: SystemTime::now(),
-            enqueued_messages: 10000,
-        }
-    }
-
-    fn clone(&self) -> Box<dyn Manager> {
-        Box::new(Clone::clone(self))
     }
 }
 
